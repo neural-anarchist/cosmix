@@ -5,7 +5,7 @@ rigid statue advance by controlled side-to-side rocking? Forward motion is
 never scripted here — it has to emerge from rigid-body dynamics, gravity,
 ground contact, friction, and rope forces, or it doesn't happen at all.
 
-**Status: Phase 1 of 5, plus a force/contact correction.** App shell, flat
+**Status: Phase 2, Step 1 of 6** (Phase 1 complete and validated). App shell, flat
 road, a free rigid-body statue with two base geometries (flat rectangular /
 lateral cylindrical rocker), an explicit rope-anchor model, validated static
 equilibrium, and a physics diagnostics panel. See [PLAN.md](./PLAN.md) for the
@@ -43,9 +43,15 @@ npm test            # unit tests (vitest)
 ## What's here right now
 
 - A perspective 3D viewport (Three.js) with orbit controls, a flat road with
-  a centerline and boundary markers, and a procedurally-built statue —
-  currently a simple box-torso/sphere-head stand-in on either a flat
-  rectangular base (A0) or a lateral cylindrical rocker base (A4).
+  a centerline and boundary markers, and a procedurally-built Moai — tapered
+  torso, arm relief, and a blocky head with brow ridge, nose and elongated
+  ears, all generated from primitives with no external mesh or texture — on
+  either a flat rectangular base (A0) or a lateral cylindrical rocker (A4).
+- A mass model with real mechanical parameters: torso taper, intrinsic forward
+  lean of the upper body (reported separately from dynamic pitch), and an
+  optional explicit COM override for abstract sweeps. Mass, COM and inertia are
+  always derived from per-collider density, never hand-specified, and are
+  cross-checked against an independent analytic calculation by unit test.
 - Rapier3D (WASM) rigid-body physics: gravity, friction, contact, and
   explicit per-collider mass/density, stepped at a fixed 1/240 s regardless
   of display frame rate.
@@ -87,9 +93,12 @@ build yet") and [PHYSICS_MODEL.md](./PHYSICS_MODEL.md):
 
 - Only 2 of the 17 specified base geometry families are implemented (A0,
   A4). The rest are visible-but-disabled options in the UI, not silently
-  substituted.
-- The torso/head are simple primitives, not the tapered procedural Moai
-  silhouette.
+  substituted. The fore-aft asymmetric families that directed walking would
+  actually require are Phase 2 Step 2.
+- The head is 12% of total height, inherited from the validated Phase 1
+  baseline; real Moai heads are nearer a third. Changing it would move the rope
+  attachment height that feeds the validated tipping threshold, so it is left
+  for an explicit regression-tested change.
 - Only direct manual rope control exists — no alternating protocols (P0–P5),
   no PD feedback control.
 - Only a flat road. No slope, concavity, or roughness.

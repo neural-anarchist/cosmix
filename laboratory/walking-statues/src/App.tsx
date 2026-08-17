@@ -1,3 +1,4 @@
+import { BaselineNotice } from "./ui/BaselineNotice";
 import { BenchmarkPanel } from "./ui/BenchmarkPanel";
 import { ControlPanel } from "./ui/ControlPanel";
 import { DiagnosticsPanel } from "./ui/DiagnosticsPanel";
@@ -47,6 +48,7 @@ export function App() {
         </div>
 
         <Viewport />
+        <BaselineNotice />
         <ReadoutPanel />
         <DiagnosticsPanel />
         <div className="controls">

@@ -100,14 +100,16 @@ existing simulations; the internals do not.
 
 ## Status
 
-**Phase 1: complete, plus a force/contact correction — build, typecheck and
-tests all passing.** See "Phase 1 — completion notes" for the original build
-and "Phase 1 correction" at the bottom of this file for the force-model fix,
-which is the current state.
+**Phase 1: complete and validated**, including the force/contact correction.
+Committed as the preserved baseline (`feat(walking-statues): validate static
+contact, tipping, and rope geometry`).
 
-Phase 2 has not started. Per the development-order instructions this
-project was built against, Phase 2 does not begin until Phase 1 has been
-reviewed and confirmed working.
+**Phase 2: Step 1 of 6 complete.** Procedural upper body and mass model, with
+taper, intrinsic forward lean and an explicit COM override. See "Phase 2 —
+Step 1 completion notes" at the bottom of this file, and
+[PHASE2_GEOMETRY_AND_CONTROL.md](./PHASE2_GEOMETRY_AND_CONTROL.md) for the
+model description. Steps 2–6 have not started; per the development order this
+project is built against, Step 2 does not begin until Step 1 is verified.
 
 ---
 
@@ -304,4 +306,80 @@ beyond, and never manually imposed translation.
       prediction.
 - [ ] Select base family A4: the benchmark reports NOT APPLICABLE (rocker has
       no tipping lever arm) rather than failing or inventing a number.
+- [ ] `npm run build`, `npm run typecheck`, `npm test` all exit clean.
+
+
+---
+
+## Phase 2 — Step 1 completion notes
+
+Procedural upper body and mass model. Build, typecheck and **67 tests** pass
+(39 preserved from Phase 1, 28 new).
+
+**Phase-1 preservation, done first and separately:**
+- All seven validated Phase 1 benchmark results are now automated tests. The
+  zero-damping static equilibrium check was the only one still living in a
+  throwaway probe; it is now a regression test, because Step 1 changes the
+  mass model and that baseline needed locking in code first.
+- Every Phase 1 regression now points at `PHASE1_BASELINE_STATUE_PARAMS`, a
+  frozen copy of the exact configuration that was validated, rather than at
+  `DEFAULT_STATUE_PARAMS`. Defaults may evolve; what the regressions certify
+  may not.
+- A permanent, non-dismissible scope notice sits under the viewport in the app
+  stating that A0/A4 on a flat symmetric road are validation models, that
+  forward motion is never imposed, the 0.15 mm vs 0.63 m negative-control
+  baseline, the 5% mirror bound, and what a walking claim must survive. Its
+  numbers come from `benchmark/baseline.ts`, the same constants the code will
+  judge against, so the figure shown and the figure enforced cannot drift.
+
+**What shipped in Step 1:**
+- Procedural Moai upper body from Three.js primitives and a hand-built
+  tapered-box buffer geometry — tapered torso, arm relief, shoulder shelf, and
+  a head with brow ridge, nose, eye sockets, lips and ears. No external mesh,
+  scan, download or texture.
+- `torsoTaper`: a real mechanical parameter (changes the collider cross-section
+  and inertia), zero of which reproduces the Phase 1 box exactly.
+- `forwardLeanDeg`: intrinsic lean of the *upper body only*, pivoting at the
+  base top so ground contact is unaffected. Reported separately from dynamic
+  pitch everywhere.
+- Explicit COM override with honest labelling as an abstract probe.
+- `visualDetail`: tessellation-only, with a test proving it cannot reach the
+  physics.
+- Per-component collider overlay, colour-coded, each with its approximation
+  stated in the diagnostics panel.
+
+**Verified in the browser, not just compiled:** components labelled and
+colour-coded; lean 18° reported as intrinsic 18.00° / dynamic 0.004°; COM moved
+to x = 0.367 m with the base still flat on the road; the static-equilibrium
+benchmark still PASSES on a leaned and tapered statue; taper 0 reproduces
+COM z = 1.648 m; COM override lands exactly on 1.050 m for z/H = 0.3; visual
+detail low→high leaves mass, COM and inertia byte-identical; zero console
+errors.
+
+**Known limitation carried forward:** the head is 12% of total height, inherited
+from the Phase 1 baseline. Real Moai heads are nearer a third, but changing it
+moves the rope attachment height that feeds the validated tipping threshold, so
+it is deliberately left for an explicit regression-tested change rather than
+being altered as a side effect of a visual improvement.
+
+### Manual test checklist (Step 1)
+
+- [ ] The statue reads as a Moai: tapered body, arms at the sides, blocky head
+      with a brow ridge and long nose.
+- [ ] "Show collider overlay" reveals exactly three primitives, coloured blue
+      (base) / gold (torso) / rust (head), and the diagnostics list each one's
+      collision approximation.
+- [ ] Setting "Torso taper" and "Forward lean" both to 0 reports mass 4000 kg
+      and COM z = 1.648 m — the validated Phase 1 body.
+- [ ] Increasing "Forward lean" tilts the upper body forward while the base
+      stays flat on the road; intrinsic lean and dynamic pitch are reported as
+      separate numbers.
+- [ ] Increasing "Torso taper" visibly narrows the torso and changes the
+      reported inertia, but not the total mass.
+- [ ] Enabling "Override COM explicitly" turns the COM marker violet and the
+      diagnostics label it an abstract probe; the COM lands exactly on the
+      requested z/H x H.
+- [ ] Changing "Tessellation" low/medium/high changes nothing in the readouts.
+- [ ] "Run static equilibrium benchmark" still PASSES with taper and lean
+      applied.
 - [ ] `npm run build`, `npm run typecheck`, `npm test` all exit clean.

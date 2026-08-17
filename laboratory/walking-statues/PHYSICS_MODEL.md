@@ -5,12 +5,11 @@ lands. It exists so nobody has to read the source to find out what's real
 physics, what's a documented stand-in, and what isn't modeled at all — the
 project's explicit requirement is that none of that stays hidden.
 
-**Current scope: Phase 1 only.** Everything below describes the state after
-Phase 1 (app shell, flat road, A0/A4 bases, manual rope forces). Phases 2–5
-add materially more physics (compound multi-primitive colliders, more base
-families, pulling protocols, energy/work accounting, concave and rough
-roads) — this file gets a corresponding update in each of those phases, not
-a rewrite at the end.
+**Current scope: Phase 1 (complete and validated), plus Phase 2 Step 1**
+(procedural upper body and mass model). The remaining Phase 2 steps — the
+extensible base-geometry factory, matched comparison, the geometry-only study
+mode, and the P1/P3 pulling protocols — and Phases 3–5 add materially more
+physics. This file is updated as each lands, not rewritten at the end.
 
 ## Directly simulated
 
@@ -48,14 +47,28 @@ a rewrite at the end.
 - **Two base geometry families**, A0 (flat rectangular prism) and A4
   (lateral cylindrical rocker), each with its own analytically-derived
   collider and matching visual mesh.
+- **Mass distribution as a first-class parameter set** (Phase 2 Step 1). Torso
+  taper and intrinsic forward lean move real material, so they change the
+  collider cross-section, the COM and the inertia tensor. Lean rotates the
+  *upper body only*, pivoting at the top of the base, so ground contact geometry
+  is unaffected — it is a modelling parameter and is reported separately from
+  dynamic pitch everywhere. Mass, COM and inertia remain derived from
+  per-collider density and are cross-checked against an independent analytic
+  calculation across taper, lean, both base families and skewed mass fractions.
 
 ## Documented approximations
 
-- **Simplified torso/head.** The display and collision geometry above the
-  base is a plain box + sphere in Phase 1, not the tapered/lathe-generated
-  Moai silhouette. This affects only appearance and coarse mass
-  distribution, not the physics *architecture* — the Phase 2 statue factory
-  swaps this out behind the same interface.
+- **Simplified upper-body collision.** The statue is *drawn* as a procedural
+  Moai — tapered torso, arm relief, blocky head with brow, nose and ears — but
+  it is *collided* as two primitives: one cuboid at the torso's mean
+  cross-section, and one sphere of radius `H_head/2` for the head. The torso
+  cuboid is exact at zero taper and an approximation of a frustum otherwise (a
+  real frustum's centroid sits below its mid-height; the box's does not). The
+  head sphere is conservative for contact, since the head does not normally
+  touch anything, but it contributes a sphere's inertia rather than a box's.
+  The collider overlay draws these three primitives colour-coded, and each
+  states its own approximation in the diagnostics, so the gap between what is
+  drawn and what is simulated is always visible rather than implied.
 - **Full-cylinder A4 rocker.** A4 is a complete 360° cylinder rather than a
   partial rocking-chair arc, so nothing in the base geometry itself imposes
   a hard roll limit (see the finding below).
@@ -84,6 +97,14 @@ a rewrite at the end.
   (3e-5 rising to 1e-3 as the statue rolls past 20°). The regression test
   asserts a deliberately generous 5% bound and documents the measurement.
 
+- **Explicit COM override** (Phase 2 Step 1). Optionally discards the derived
+  mass properties and forces the COM to explicit offsets, for sweeps where COM
+  is the independent variable. Collider shapes are untouched so contact is
+  unchanged, but the inertia tensor is carried over from the derived body rather
+  than recomputed — an overridden statue is therefore an **abstract probe, not a
+  self-consistent rigid body**, and is labelled as one in the UI. Results from it
+  explore a parameter axis; they do not simulate a buildable statue.
+
 ## Not modeled yet
 
 - Rope compliance or slack. A rope's *geometry* is now explicit (external
@@ -97,7 +118,9 @@ a rewrite at the end.
 - Work/energy accounting, contact-force event logging, slip ratio, lateral
   drift, cost-of-transport, or any of the documented failure-state
   criteria beyond a placeholder 60° "fallen" angle check.
-- Base families A5, B0, B1, B2, B3, B4, B5, B6, C0–C5.
+- Base families A1, A2, A3, A5, B0, B1, B2, B3, B4, B5, B6, C0–C5. The fore-aft
+  asymmetric families that directed walking would actually require are Phase 2
+  Step 2 — so no result obtained so far has had the geometry available to walk.
 - Everything under Calibration mode, batch sweeps, matched-comparison mode,
   and export.
 

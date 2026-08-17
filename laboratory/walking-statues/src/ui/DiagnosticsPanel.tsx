@@ -6,6 +6,14 @@ import { useSimStore } from "../state/store";
 import { SideViewDiagram } from "./diagrams/SideViewDiagram";
 import { TopViewDiagram } from "./diagrams/TopViewDiagram";
 
+/** Matches the wireframe colours in `statue/factory.ts` so the overlay and this
+ * legend name the same thing. */
+const COMPONENT_SWATCH: Record<string, string> = {
+  base: "◼ blue",
+  torso: "◼ gold",
+  head: "◼ rust"
+};
+
 const fmt = (v: number, digits = 2) => (Number.isFinite(v) ? v.toFixed(digits) : "—");
 const fmtVec = (v: Vec3, digits = 1) => `(${fmt(v.x, digits)}, ${fmt(v.y, digits)}, ${fmt(v.z, digits)})`;
 const fmtOrNull = (v: number | null, digits = 0, suffix = "") =>
@@ -75,8 +83,47 @@ export function DiagnosticsPanel() {
                 <Row label="Weight Mg" value={`${fmt(readout.thresholds.weightN, 0)} N`} />
               </DiagGroup>
 
+              <DiagGroup title="Attitude">
+                <Row
+                  label="Intrinsic forward lean"
+                  value={`${fmt(readout.intrinsicLeanDeg, 2)}°`}
+                  note="geometry parameter, not a result"
+                />
+                <Row
+                  label="Dynamic pitch"
+                  value={`${fmt(readout.pitchDeg, 3)}°`}
+                  note="live simulated fore-aft tilt"
+                />
+                <Row
+                  label="Upper-body total"
+                  value={`${fmt(readout.totalUpperBodyPitchDeg, 3)}°`}
+                  note="lean + dynamic pitch"
+                />
+                <Row label="Roll" value={`${fmt(readout.rollDeg, 3)}°`} />
+                <Row label="Yaw" value={`${fmt(readout.yawDeg, 3)}°`} />
+              </DiagGroup>
+
+              <DiagGroup title="Compound components">
+                <Row label="Base family" value={readout.baseLabel} />
+                {readout.components.map((c) => (
+                  <Row
+                    key={c.component}
+                    label={c.component}
+                    value={COMPONENT_SWATCH[c.component] ?? "—"}
+                    note={c.approximation}
+                  />
+                ))}
+              </DiagGroup>
+
               <DiagGroup title="Body state">
                 <Row label="Mass (from Rapier)" value={`${fmt(readout.massKg, 0)} kg`} />
+                <Row
+                  label="COM (body-local, m)"
+                  value={fmtVec(readout.comLocal, 3)}
+                  note={readout.comOverridden ? "EXPLICITLY OVERRIDDEN — abstract probe" : "derived from geometry"}
+                  flag={readout.comOverridden}
+                />
+                <Row label="Principal inertia (kg·m²)" value={fmtVec(readout.principalInertia, 0)} />
                 <Row label="COM position (m)" value={fmtVec(readout.comWorld, 3)} />
                 <Row label="Velocity (m/s)" value={fmtVec(readout.linvel, 4)} />
                 <Row label="Angular velocity (rad/s)" value={fmtVec(readout.angvel, 4)} />
@@ -92,7 +139,6 @@ export function DiagnosticsPanel() {
                   note={`rest tolerance ${DEFAULT_REST_TOLERANCES.angularSpeedDegPerS} °/s`}
                   flag={readout.angularSpeedDegPerS > DEFAULT_REST_TOLERANCES.angularSpeedDegPerS}
                 />
-                <Row label="Roll / Pitch" value={`${fmt(readout.rollDeg)}° / ${fmt(readout.pitchDeg)}°`} />
               </DiagGroup>
 
               <DiagGroup title="Contact">

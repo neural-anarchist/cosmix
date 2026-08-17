@@ -23,6 +23,9 @@ const RADIAL_SEGMENTS = 28;
 export const a4LateralRocker: BaseGeometryModule = {
   id: "A4",
   label: "A4 — Lateral cylindrical rocker",
+  colliderApproximation:
+    "Exact analytic cylinder (axis along x), not a faceted mesh — so rolling " +
+    "contact is smooth rather than stepping between facets.",
 
   dims(params): BaseDims {
     const { heightM: H, totalMassKg: M } = params;

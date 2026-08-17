@@ -54,6 +54,13 @@ export interface BaseDims {
 export interface BaseGeometryModule {
   id: BaseFamilyId;
   label: string;
+  /**
+   * How this family's collision geometry approximates its visual shape, in one
+   * sentence, shown next to the collider overlay. Every family must state this:
+   * a curved base rendered smoothly but collided as primitives is a modelling
+   * choice the reader is entitled to see, not an implementation detail.
+   */
+  colliderApproximation: string;
   /** Scalar dimensions only — safe with no Rapier module and no scene. */
   dims(params: StatueParams): BaseDims;
   /** Collider descriptors in body-local space (base bottom at local z = 0).

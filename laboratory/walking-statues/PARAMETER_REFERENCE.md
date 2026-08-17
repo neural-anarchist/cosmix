@@ -1,9 +1,9 @@
 # PARAMETER_REFERENCE — Walking Statues
 
-Documents the parameters that actually exist in the running app. This is
-Phase 1's subset of the full parameter set specified for the project; it
-grows with each phase rather than being written once against the full
-spec up front. Defaults live in `src/statue/defaults.ts` and
+Documents the parameters that actually exist in the running app — currently
+Phase 1 plus Phase 2 Step 1. It grows with each phase rather than being written
+once against the full spec up front, so anything absent here is genuinely
+absent from the code. Defaults live in `src/statue/defaults.ts` and
 `src/state/store.ts`.
 
 ## Statue & mass
@@ -14,8 +14,33 @@ spec up front. Defaults live in `src/statue/defaults.ts` and
 | Mass M | $M$ | kg | 500–14000 | 4000 | Total statue mass. |
 | Base mass fraction | — | — | 0.05–0.75 | 0.35 | Fraction of $M$ assigned to the base collider(s). |
 | Head mass fraction | — | — | 0.05–0.5 | 0.25 | Fraction of $M$ assigned to the head. Remainder goes to the torso. |
-| Torso width / H | — | — | 0.08–0.4 | 0.22 | Phase 1 torso is a simple box. |
-| Torso depth / H | — | — | 0.08–0.4 | 0.16 | |
+| Shoulder width / H | — | — | 0.08–0.4 | 0.22 | Torso width (y) at the shoulders, the widest point of the upper body. |
+| Body depth / H | — | — | 0.08–0.4 | 0.16 | Torso depth (x) at the shoulders. |
+| Torso taper | — | — | 0–0.6 | 0.22 | Fractional narrowing from shoulders downward: `bottom = top x (1 - taper)`. **Mechanical, not cosmetic** — changes the collider cross-section and the inertia tensor. 0 reproduces the validated Phase 1 box exactly. |
+| Forward lean | $\theta_{lean}$ | deg | −15–30 | 0 | Intrinsic lean of the **upper body only**, pivoting at the top of the base so ground contact is unaffected. Distinct from dynamic pitch; both are reported separately. |
+
+## Center of mass
+
+| Control | Symbol | Units | Range | Default | Notes |
+|---|---|---|---|---|---|
+| Override COM explicitly | — | — | on/off | off | When off, COM is derived from geometry and density. When on, the derived mass properties are discarded and the COM is forced to the offsets below. |
+| Forward COM offset x/H | $x_{COM}/H$ | — | −0.15–0.15 | 0 | Only applied when the override is on. |
+| Lateral COM offset y/H | $y_{COM}/H$ | — | −0.15–0.15 | 0 | Only applied when the override is on. |
+| COM height z/H | $z_{COM}/H$ | — | 0.15–0.8 | 0.471 | Only applied when the override is on. |
+
+An overridden COM keeps every collider *shape* unchanged, so contact behaviour
+is unaffected, but the rotational inertia is carried over from the derived
+configuration rather than recomputed. That makes an overridden statue an
+**abstract probe, not a self-consistent rigid body** — its mass distribution
+corresponds to no real arrangement of its own geometry. The COM marker turns
+violet and the diagnostics label it accordingly. See
+PHASE2_GEOMETRY_AND_CONTROL.md.
+
+## Visual detail
+
+| Control | Units | Range | Default | Notes |
+|---|---|---|---|---|
+| Tessellation | — | low / medium / high | medium | Mesh triangle counts only. A unit test asserts mass, COM, inertia and the collider set are identical across all three levels, so the displayed statue and the simulated statue can never differ. |
 
 ## Base geometry
 

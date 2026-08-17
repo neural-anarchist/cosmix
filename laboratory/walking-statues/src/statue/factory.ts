@@ -1,28 +1,48 @@
 import * as THREE from "three";
 import type { BuildContext } from "../physics/types";
 import { getBaseModule } from "./bases/registry";
-import { createStatueBody } from "./body";
+import { createStatueBody, type StatueComponent } from "./body";
 import { STATUE_STONE_MATERIAL } from "./materials";
+import { buildHeadVisual, buildTorsoVisual } from "./procedural";
 import type { StatueBuild, StatueParams } from "./types";
 
 const COM_MARKER_RADIUS_M = 0.08;
 const COM_MARKER_MATERIAL = new THREE.MeshBasicMaterial({ color: 0xd7b470 });
+/** An overridden COM is an abstract probe rather than a derived property, so it
+ * is drawn in a different colour to stop it reading as a measurement. */
+const COM_OVERRIDE_MATERIAL = new THREE.MeshBasicMaterial({ color: 0x9b6bff });
 
-const COLLIDER_WIREFRAME_MATERIAL = new THREE.MeshBasicMaterial({
-  color: 0x83b8d7,
-  wireframe: true,
-  transparent: true,
-  opacity: 0.85
-});
+/**
+ * One wireframe colour per compound component, so the collider overlay answers
+ * "which primitive is which" at a glance instead of showing an undifferentiated
+ * cage. Matches the legend in the diagnostics panel.
+ */
+export const COMPONENT_COLORS: Record<StatueComponent, number> = {
+  base: 0x83b8d7,
+  torso: 0xd7b470,
+  head: 0xd68c70
+};
+
+const COMPONENT_MATERIALS: Record<StatueComponent, THREE.Material> = {
+  base: wireframeMaterial(COMPONENT_COLORS.base),
+  torso: wireframeMaterial(COMPONENT_COLORS.torso),
+  head: wireframeMaterial(COMPONENT_COLORS.head)
+};
+
+function wireframeMaterial(color: number): THREE.MeshBasicMaterial {
+  return new THREE.MeshBasicMaterial({ color, wireframe: true, transparent: true, opacity: 0.85 });
+}
 
 /**
  * Builds the simulated statue: the physics body (delegated to
  * `createStatueBody`, which the headless benchmarks share) plus the
  * display-only meshes, collider wireframe overlay and COM marker.
  *
- * The display geometry is never used for collision and the collision
- * geometry is never rendered except through the explicit overlay — both
- * derive from the same `StatueGeometry` scalars so they cannot drift.
+ * The display geometry is never used for collision and the collision geometry
+ * is never rendered except through the explicit overlay. Both are placed from
+ * the same `Placement` values in `StatueGeometry`, so the drawn statue and the
+ * simulated statue cannot end up in different poses — including under an
+ * intrinsic forward lean, which moves the upper body relative to the base.
  */
 export function createStatue(
   params: StatueParams,
@@ -34,49 +54,70 @@ export function createStatue(
 
   const body = createStatueBody(params, RAPIER, world, contactFrictionCoefficient, contactRestitution);
   const { geometry } = body;
-  const { torso, head } = geometry;
+  const { torso, head, torsoPlacement, headPlacement } = geometry;
+
+  const baseModule = getBaseModule(params.baseFamily);
 
   // ---- Display meshes.
-  const baseVisual = getBaseModule(params.baseFamily).visual(params);
-
   const visual = new THREE.Group();
   visual.name = "statue-visual";
+
+  const baseVisual = baseModule.visual(params);
   visual.add(baseVisual);
 
-  const torsoMesh = new THREE.Mesh(
-    new THREE.BoxGeometry(torso.depthX, torso.widthY, torso.heightZ),
+  const torsoVisual = buildTorsoVisual(
+    {
+      depthBottomX: torso.depthBottomX,
+      widthBottomY: torso.widthBottomY,
+      depthTopX: torso.depthTopX,
+      widthTopY: torso.widthTopY,
+      heightZ: torso.heightZ,
+      detail: params.visualDetail
+    },
     STATUE_STONE_MATERIAL
   );
-  torsoMesh.position.set(0, 0, torso.centerZ);
-  torsoMesh.castShadow = true;
-  torsoMesh.receiveShadow = true;
-  visual.add(torsoMesh);
+  applyPlacement(torsoVisual, torsoPlacement);
+  visual.add(torsoVisual);
 
-  const headMesh = new THREE.Mesh(new THREE.SphereGeometry(head.radius, 20, 16), STATUE_STONE_MATERIAL);
-  headMesh.position.set(0, 0, head.centerZ);
-  headMesh.castShadow = true;
-  visual.add(headMesh);
+  const headVisual = buildHeadVisual(
+    { depthX: head.depthX, widthY: head.widthY, heightZ: head.heightZ, detail: params.visualDetail },
+    STATUE_STONE_MATERIAL
+  );
+  applyPlacement(headVisual, headPlacement);
+  visual.add(headVisual);
 
   scene.add(visual);
 
-  // ---- Collider-visibility overlay: wireframe proxies, one per collider,
-  // toggled independently of the display mesh above.
+  // ---- Collider overlay: one wireframe proxy per actual collider, built from
+  // the collider's own dimensions rather than from the display mesh, and
+  // coloured by component.
   const colliderVisual = new THREE.Group();
   colliderVisual.name = "statue-collider-overlay";
   colliderVisual.visible = false;
-  for (const child of baseVisual.children.length ? baseVisual.children : [baseVisual]) {
-    colliderVisual.add(cloneAsWireframe(child));
-  }
-  const torsoWire = new THREE.Mesh(torsoMesh.geometry, COLLIDER_WIREFRAME_MATERIAL);
-  torsoWire.position.copy(torsoMesh.position);
-  torsoWire.quaternion.copy(torsoMesh.quaternion);
+
+  const baseWire = cloneAsWireframe(baseVisual, COMPONENT_MATERIALS.base);
+  colliderVisual.add(baseWire);
+
+  const torsoWire = new THREE.Mesh(
+    new THREE.BoxGeometry(torso.depthX, torso.widthY, torso.heightZ),
+    COMPONENT_MATERIALS.torso
+  );
+  applyPlacement(torsoWire, torsoPlacement);
   colliderVisual.add(torsoWire);
-  const headWire = new THREE.Mesh(headMesh.geometry, COLLIDER_WIREFRAME_MATERIAL);
-  headWire.position.copy(headMesh.position);
+
+  const headWire = new THREE.Mesh(
+    new THREE.SphereGeometry(head.radius, 16, 12),
+    COMPONENT_MATERIALS.head
+  );
+  applyPlacement(headWire, headPlacement);
   colliderVisual.add(headWire);
+
   scene.add(colliderVisual);
 
-  const comMarker = new THREE.Mesh(new THREE.SphereGeometry(COM_MARKER_RADIUS_M, 12, 10), COM_MARKER_MATERIAL);
+  const comMarker = new THREE.Mesh(
+    new THREE.SphereGeometry(COM_MARKER_RADIUS_M, 12, 10),
+    body.mass.comOverridden ? COM_OVERRIDE_MATERIAL : COM_MARKER_MATERIAL
+  );
   comMarker.visible = false;
   scene.add(comMarker);
 
@@ -86,7 +127,9 @@ export function createStatue(
     comMarker,
     rigidBody: body.rigidBody,
     colliders: body.colliders,
+    colliderInfo: body.colliderInfo,
     geometry,
+    mass: body.mass,
     dispose(): void {
       scene.remove(visual);
       scene.remove(colliderVisual);
@@ -99,15 +142,26 @@ export function createStatue(
   };
 }
 
-function cloneAsWireframe(source: THREE.Object3D): THREE.Object3D {
+function applyPlacement(
+  object: THREE.Object3D,
+  placement: { position: { x: number; y: number; z: number }; rotation: { x: number; y: number; z: number; w: number } }
+): void {
+  object.position.set(placement.position.x, placement.position.y, placement.position.z);
+  object.quaternion.set(placement.rotation.x, placement.rotation.y, placement.rotation.z, placement.rotation.w);
+}
+
+function cloneAsWireframe(source: THREE.Object3D, material: THREE.Material): THREE.Object3D {
   if (source instanceof THREE.Mesh) {
-    const wire = new THREE.Mesh(source.geometry, COLLIDER_WIREFRAME_MATERIAL);
+    const wire = new THREE.Mesh(source.geometry, material);
     wire.position.copy(source.position);
     wire.quaternion.copy(source.quaternion);
+    wire.scale.copy(source.scale);
     return wire;
   }
   const group = new THREE.Group();
-  source.children.forEach((child) => group.add(cloneAsWireframe(child)));
+  group.position.copy(source.position);
+  group.quaternion.copy(source.quaternion);
+  source.children.forEach((child) => group.add(cloneAsWireframe(child, material)));
   return group;
 }
 

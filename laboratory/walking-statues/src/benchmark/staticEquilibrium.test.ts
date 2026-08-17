@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { getRapier, type RapierModule } from "../physics/rapierSetup";
 import { DEFAULT_ROAD_PARAMS } from "../state/store";
-import { DEFAULT_STATUE_PARAMS } from "../statue/defaults";
+import { PHASE1_BASELINE_STATUE_PARAMS } from "../statue/defaults";
 import { lateralRopeParams } from "../control/ropeDefaults";
 import { computeStatueGeometry } from "../statue/geometry";
 import { computeThresholds } from "../physics/thresholds";
@@ -17,7 +17,10 @@ beforeAll(async () => {
 }, 30_000);
 
 const A0_ROAD = { ...DEFAULT_ROAD_PARAMS };
-const A0_STATUE = { ...DEFAULT_STATUE_PARAMS, baseFamily: "A0" as const };
+// Pinned to the frozen Phase 1 baseline, not to DEFAULT_STATUE_PARAMS: defaults
+// are allowed to evolve with the statue model, but what these tests certify is
+// the exact configuration the Phase 1 results were validated against.
+const A0_STATUE = { ...PHASE1_BASELINE_STATUE_PARAMS, baseFamily: "A0" as const };
 
 describe("static equilibrium benchmark", () => {
   it(
@@ -71,7 +74,7 @@ describe("static equilibrium benchmark", () => {
 
   it("reports the benchmark as not applicable for a rocker base rather than failing it", () => {
     const result = runStaticEquilibriumBenchmark(RAPIER, {
-      statueParams: { ...DEFAULT_STATUE_PARAMS, baseFamily: "A4" },
+      statueParams: { ...PHASE1_BASELINE_STATUE_PARAMS, baseFamily: "A4" },
       roadParams: A0_ROAD,
       ...DEFAULT_STATIC_EQUILIBRIUM
     });

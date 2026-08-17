@@ -84,10 +84,14 @@ src/
   statue/
     types.ts            StatueParams, StatueBuild, BaseFamilyId
     defaults.ts         default StatueParams
-    geometry.ts         all scalar geometry: base dims, torso/head
-                        placement, analytic COM, default rope attachments [headless]
-    body.ts             the compound rigid body + colliders               [headless]
-    factory.ts          body.ts + display meshes, collider overlay, COM marker
+    geometry.ts         all scalar geometry: base dims, torso taper, lean
+                        placements, analytic COM, COM override, default
+                        rope attachments                                  [headless]
+    body.ts             the compound rigid body + colliders, per-component
+                        labelling, and the explicit COM override          [headless]
+    procedural.ts       Moai display geometry from primitives only
+    factory.ts          body.ts + display meshes, per-component collider
+                        overlay, COM marker
     bases/
       types.ts          BaseGeometryModule: dims / colliderDescs / visual
       registry.ts       id -> module map; unimplemented ids throw a clear
@@ -102,6 +106,7 @@ src/
     tolerances.ts       quantified rest tolerances + regime thresholds      [headless]
     regime.ts           REST/STICKING/SLIDING/ROCKING/TOPPLING/AIRBORNE     [headless]
   benchmark/
+    baseline.ts         the frozen Phase 1 negative-control constants     [headless]
     harness.ts          full statue-on-road sim with no renderer, driving
                         the production force path                          [headless]
     staticEquilibrium.ts  the static equilibrium benchmark                 [headless]
@@ -114,6 +119,7 @@ src/
     ControlPanel.tsx    statue / base / road+contact parameters
     RopeControls.tsx    the twelve rope coordinates + tension
     ReadoutPanel.tsx    headline readouts
+    BaselineNotice.tsx  permanent statement of what the model does not show
     DiagnosticsPanel.tsx  collapsible Physics Diagnostics
     BenchmarkPanel.tsx  runs the two validation experiments
     diagrams/           TopViewDiagram, SideViewDiagram
@@ -193,8 +199,9 @@ aggregate mass, COM and inertia. `statue/geometry.test.ts` cross-checks the
 analytic COM against Rapier's own `worldCom()` for both base families, so a
 density or volume error cannot pass silently.
 
-Base families implement `BaseGeometryModule`, split across three methods so
-the physics never needs the renderer:
+Base families implement `BaseGeometryModule`, split across three methods plus a
+required `colliderApproximation` string, so the physics never needs the renderer
+and every family must state how its collider approximates its visual:
 
 - `dims(params): BaseDims` — pure scalars, including `contactHalfWidthY` (the
   tipping lever arm `b`) and `contactKind` (`"flat" | "rocker"`). The

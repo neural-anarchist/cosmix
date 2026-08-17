@@ -7,6 +7,7 @@ import { quaternionToRollPitchYaw, radToDeg } from "./orientation";
 import { add, length as vecLength, type Quat, type Vec3 } from "./vec3";
 import { buildFlatRoad } from "../road/flatRoad";
 import type { RoadBuild, RoadParams } from "../road/types";
+import { getBaseModule } from "../statue/bases/registry";
 import { createStatue } from "../statue/factory";
 import type { StatueBuild, StatueParams } from "../statue/types";
 import { applyRopeForces } from "../control/ropeForces";
@@ -38,13 +39,35 @@ export interface EngineSnapshot {
   dxM: number;
   dyM: number;
   rollDeg: number;
+  /**
+   * Dynamic pitch: the live simulated fore-aft tilt read off the body's
+   * quaternion. Deliberately reported separately from `intrinsicLeanDeg` — a
+   * statue built leaning forward 10 deg and standing still has 10 deg of
+   * intrinsic lean and 0 deg of dynamic pitch, and conflating the two would make
+   * a static statue look like it was falling over.
+   */
   pitchDeg: number;
   yawDeg: number;
+  /** Intrinsic forward lean baked into the geometry, degrees. A modelling
+   * parameter, not a simulation result. */
+  intrinsicLeanDeg: number;
+  /** Total fore-aft attitude of the upper body: intrinsic lean + dynamic pitch. */
+  totalUpperBodyPitchDeg: number;
 
   massKg: number;
   comWorld: Vec3;
   comHeightM: number;
+  /** COM in body-local coordinates, so it can be compared against the
+   * geometry's analytic value and against an override. */
+  comLocal: Vec3;
   principalInertia: Vec3;
+  /** True when the COM was explicitly overridden rather than derived from
+   * geometry — an abstract probe, not a self-consistent rigid body. */
+  comOverridden: boolean;
+  /** Compound components and how each one's collider approximates its visual. */
+  components: { component: string; approximation: string }[];
+  baseFamily: string;
+  baseLabel: string;
 
   linvel: Vec3;
   angvel: Vec3;
@@ -544,8 +567,12 @@ export class SimulationEngine {
 
   private publish(): void {
     if (!this.statue) return;
-    const body = this.statue.rigidBody;
-    const geometry = this.statue.geometry;
+    // Captured locally because the listener callback at the end of this method
+    // is a closure, and TypeScript cannot carry the `this.statue` narrowing into
+    // it.
+    const statue = this.statue;
+    const body = statue.rigidBody;
+    const geometry = statue.geometry;
 
     const com = this.comWorld();
     const rot = body.rotation();
@@ -630,10 +657,20 @@ export class SimulationEngine {
         rollDeg,
         pitchDeg,
         yawDeg: radToDeg(yaw),
+        intrinsicLeanDeg: radToDeg(geometry.forwardLeanRad),
+        totalUpperBodyPitchDeg: radToDeg(geometry.forwardLeanRad) + pitchDeg,
         massKg,
         comWorld: com,
         comHeightM: com.z,
+        comLocal: statue.mass.comLocal,
         principalInertia: { x: principal.x, y: principal.y, z: principal.z },
+        comOverridden: statue.mass.comOverridden,
+        components: statue.colliderInfo.map((info) => ({
+          component: info.component,
+          approximation: info.approximation
+        })),
+        baseFamily: this.statueParams.baseFamily,
+        baseLabel: getBaseModule(this.statueParams.baseFamily).label,
         linvel,
         angvel,
         speedMps,

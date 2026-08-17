@@ -5,7 +5,7 @@ import { mirrorRopeGeometry, type RopeParams } from "../control/ropeModel";
 import { computeStatueGeometry } from "../statue/geometry";
 import { computeThresholds } from "../physics/thresholds";
 import { DEFAULT_ROAD_PARAMS } from "../state/store";
-import { DEFAULT_STATUE_PARAMS } from "../statue/defaults";
+import { PHASE1_BASELINE_STATUE_PARAMS } from "../statue/defaults";
 import { BenchmarkHarness, type HarnessSample } from "./harness";
 
 let RAPIER: RapierModule;
@@ -14,7 +14,7 @@ beforeAll(async () => {
   RAPIER = await getRapier();
 }, 30_000);
 
-const STATUE = { ...DEFAULT_STATUE_PARAMS, baseFamily: "A0" as const };
+const STATUE = { ...PHASE1_BASELINE_STATUE_PARAMS, baseFamily: "A0" as const };
 const ROAD = { ...DEFAULT_ROAD_PARAMS };
 
 /**

@@ -6,6 +6,7 @@ import type { BaseDims, BaseGeometryModule } from "./types";
 export const a0FlatRect: BaseGeometryModule = {
   id: "A0",
   label: "A0 — Flat rectangular prism",
+  colliderApproximation: "Exact: a single cuboid, identical to the visual mesh.",
 
   dims(params): BaseDims {
     const { heightM: H, totalMassKg: M } = params;
