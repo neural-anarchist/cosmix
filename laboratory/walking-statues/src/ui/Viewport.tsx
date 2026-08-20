@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { SimulationEngine } from "../core/SimulationEngine";
-import { useSimStore } from "../state/store";
+import { selectResolution, useSimStore } from "../state/store";
 
 export function Viewport() {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -16,12 +16,17 @@ export function Viewport() {
   const [leftHeld, setLeftHeld] = useState(false);
   const [rightHeld, setRightHeld] = useState(false);
 
-  const statueParams = useSimStore((s) => s.statueParams);
+  // The statue actually built is the *resolved* one: raw parameters in raw
+  // geometry mode, normalized parameters plus any ballast under a matched
+  // comparison. Selecting the resolution rather than the raw params is what
+  // makes the normalization real instead of a report about a statue nobody built.
+  const statueParams = useSimStore((s) => selectResolution(s).statueParams);
   const roadParams = useSimStore((s) => s.roadParams);
   const ropeParams = useSimStore((s) => s.ropeParams);
   const showColliders = useSimStore((s) => s.showColliders);
   const setShowColliders = useSimStore((s) => s.setShowColliders);
   const showComMarker = useSimStore((s) => s.showComMarker);
+  const showBallast = useSimStore((s) => s.showBallast);
   const setShowComMarker = useSimStore((s) => s.setShowComMarker);
   const setReadout = useSimStore((s) => s.setReadout);
   const status = useSimStore((s) => s.readout?.status ?? "gray");
@@ -37,7 +42,7 @@ export function Viewport() {
 
     engine
       .init(
-        useSimStore.getState().statueParams,
+        selectResolution(useSimStore.getState()).statueParams,
         useSimStore.getState().roadParams,
         useSimStore.getState().ropeParams
       )
@@ -72,6 +77,10 @@ export function Viewport() {
     if (!ready) return;
     engineRef.current?.updateStatueParams(statueParams);
   }, [ready, statueParams]);
+
+  useEffect(() => {
+    engineRef.current?.setShowBallast(showBallast);
+  }, [ready, showBallast]);
 
   const roadGeometryKey = `${roadParams.type}|${roadParams.lengthM}|${roadParams.widthM}`;
   useEffect(() => {

@@ -1,5 +1,6 @@
 import type * as RAPIER from "@dimforge/rapier3d-compat";
 import type * as THREE from "three";
+import type { Vec3 } from "../core/vec3";
 import type { Disposable } from "../physics/types";
 import type { StatueColliderInfo, StatueMassReport } from "./body";
 import type { StatueGeometry } from "./geometry";
@@ -129,15 +130,49 @@ export interface StatueParams {
    */
   visualDetail: VisualDetail;
 
+  /**
+   * Internal ballast added by matched-comparison mode. Null in raw geometry
+   * mode, which is every configuration Phase 1 and Steps 1-2 were validated
+   * against, so this field is inert unless a comparison lock puts something in
+   * it.
+   */
+  ballast: BallastSpec | null;
+
   linearDampingSI: number;
   angularDampingSI: number;
 }
 
 export type VisualDetail = "low" | "medium" | "high";
 
+/**
+ * An explicitly labelled internal ballast mass, used by matched-comparison mode
+ * to bring two unlike shapes to the same total mass and centre of mass.
+ *
+ * It is a *mass*, not a shape: it is applied through Rapier's additional
+ * mass-properties, which are summed with the collider-derived properties, so no
+ * collider is added, moved or resized and the contact behaviour is provably
+ * identical to the same statue without it. That is the whole reason it is
+ * preferred over the abstract COM override — the resulting body is a real rigid
+ * body with a real mass distribution, not a probe.
+ *
+ * It is drawn in the collider overlay so a normalised statue never looks like an
+ * un-normalised one.
+ */
+export interface BallastSpec {
+  massKg: number;
+  /** Body-local position. Constrained to lie inside the statue's own envelope;
+   * a target that would require it outside is rejected, not approximated. */
+  localPosition: Vec3;
+  /** Why this ballast exists, shown verbatim in diagnostics. */
+  reason: string;
+}
+
 export interface StatueBuild extends Disposable {
   visual: THREE.Group;
   colliderVisual: THREE.Group;
+  /** Marker for matched-comparison ballast, or null when there is none. Lives
+   * inside `colliderVisual` and has its own visibility toggle on top of it. */
+  ballastMarker: THREE.Object3D | null;
   comMarker: THREE.Object3D;
   rigidBody: RAPIER.RigidBody;
   colliders: RAPIER.Collider[];

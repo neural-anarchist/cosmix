@@ -1,7 +1,7 @@
 # PARAMETER_REFERENCE — Walking Statues
 
 Documents the parameters that actually exist in the running app — currently
-Phase 1 plus Phase 2 Steps 1 and 2. It grows with each phase rather than being written
+Phase 1 plus Phase 2 Steps 1-3. It grows with each phase rather than being written
 once against the full spec up front, so anything absent here is genuinely
 absent from the code. Defaults live in `src/statue/defaults.ts` and
 `src/state/store.ts`.
@@ -134,6 +134,39 @@ parameters change, **until** you edit any rope coordinate by hand; after that
 they stay put (silently overwriting a deliberate value would be worse) and
 "Re-snap attachments to statue" restores the tracking. "Restore default
 geometry" resets all twelve coordinates.
+
+## Matched comparison
+
+Locks and presets live in `src/comparison/`. A preset says *which* quantities are
+held equal across a family switch; the targets come from a baseline family you
+capture explicitly. See MATCHED_COMPARISON_GUIDE.md for the full treatment.
+
+| Control | Values | Default | Notes |
+|---|---|---|---|
+| Preset | Raw Geometry, Matched Envelope, Matched Mass + COM, Matched Mass + COM + Width, Matched Volume + Width, Matched Moai Candidate Trial | Raw Geometry | Matched Moai Candidate Trial is the preset for candidate comparisons. |
+| Individual locks | 16 checkboxes in advanced mode | per preset | Body: height, mass, COM, principal inertia. Base: max width, fore-aft length, base height, base mass, base volume. Environment: road, rope anchors, rope attachments, max tension, protocol, solver, initial pose. |
+| Show internal ballast | on/off | on | Draws matched-comparison ballast in the collider overlay. |
+
+### Lock tolerances
+
+| Quantity | Tolerance |
+|---|---|
+| Dimensions (height, width, length, base height) | 0.1 mm |
+| Total and base mass | 0.01% relative |
+| Centre of mass | 0.1 mm |
+| Base volume | 0.1% relative |
+| Principal inertia (when locked) | 0.1% relative |
+
+A lock that cannot be met inside these tolerances marks the scenario
+`MATCHED COMPARISON INVALID` rather than being silently approximated.
+
+### Internal ballast
+
+| Quantity | Value | Notes |
+|---|---|---|
+| Maximum ballast fraction | 50% of total mass | Past this the body is mostly counterweight and a comparison between two such bodies compares ballast placements, not shapes. |
+| Placement | smallest workable fraction, inside the base, torso or head | Chosen to disturb the geometry's own mass as little as possible. Containment is tested against the actual body, not its bounding box. |
+| Applied as | Rapier additional mass properties | A mass, not a shape: no collider is added, moved or resized, so contact behaviour is unchanged. |
 
 ## Diagnostic tolerances
 

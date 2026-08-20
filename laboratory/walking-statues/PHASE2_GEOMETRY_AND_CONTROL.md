@@ -12,7 +12,7 @@ which sections describe working code and which describe work not yet started.
 |---|---|---|
 | 1 | Procedural upper body and mass model | **Implemented** |
 | 2 | Extensible base-geometry factory (A0–A5, B0, B2–B6) | **Implemented** |
-| 3 | Matched-comparison mode | Not started |
+| 3 | Matched-comparison mode | **Implemented** |
 | 4 | Geometry-only study mode | Not started |
 | 5 | P1 alternating-pulse controller | Not started |
 | 6 | P3 angle-triggered feedback controller | Not started |
@@ -388,15 +388,80 @@ under 1 mm of travel and under 1 mm/s after ten seconds, for every family.
   the geometry; whether any of it changes the response to the validated rope
   forces is Step 4's question, and nothing here has measured it.
 
+
 ---
 
-## Steps 3–6 — not yet implemented
+## Step 3 — Matched-comparison mode
+
+Full detail lives in [MATCHED_COMPARISON_GUIDE.md](./MATCHED_COMPARISON_GUIDE.md);
+this section records what shipped and what it costs.
+
+The application now distinguishes **Raw Geometry** — each family carrying the
+mass, COM and inertia its own shape implies — from **Matched Comparison**, where
+chosen quantities are held equal across a family switch so that shape is the
+only thing that varies. Six named presets range from Matched Envelope (bounding
+dimensions only) to Matched Moai Candidate Trial (mass, COM, both plan
+dimensions, the whole environment and the initial pose), which is the preset
+later candidate comparisons should use.
+
+Three properties are worth stating here because they are what make the mode
+trustworthy rather than decorative:
+
+- **Geometry is never secretly distorted to force mass or COM equality.**
+  Dimension locks adjust the family's own normalized parameters and rebuild;
+  mass locks scale component densities; COM locks add an explicitly labelled
+  internal ballast mass and report exactly where it went.
+- **Ballast is a mass, not a shape.** It is applied through Rapier's additional
+  mass properties, which are summed with the collider-derived ones, so no
+  collider is added, moved or resized — the contact behaviour of a ballasted
+  statue is provably identical to the same statue without it, asserted by a test
+  that compares collider sets directly.
+- **A constraint that cannot be met is rejected, not approximated.** The banner
+  goes to `MATCHED COMPARISON INVALID`, the cause is named, the other locked
+  quantities are left alone, and the statue is still built as a valid stable
+  body.
+
+### The defect found while building it
+
+An early version tested ballast containment against the statue's bounding box.
+A wide-based statue's bounding box is mostly empty air at shoulder height, so
+B0's ballast was placed at x = 0.373 m against a torso only 0.28 m half-deep —
+9 cm outside the statue, reported as internal. Containment now walks the actual
+base footprint polygon, the leaned torso box and the head sphere, and the
+ballast moved to x = 0.271 m, inside the torso. The bounding-box case is kept as
+a regression test.
+
+A second defect: environment drift was only recomputed when the statue changed,
+so nudging the road-friction slider after capturing a baseline silently
+invalidated a comparison that still displayed as matched. Drift is now
+recomputed from every setter that can touch a lockable quantity.
+
+### Step 3 limitations
+
+- **Base height cannot be matched on A4 or B5.** A cylindrical rocker is as tall
+  as it is wide, and B5's reachable height range at the default width is
+  0.595–1.619 m against a 0.560 m target. Matched Envelope is genuinely invalid
+  for both, and says so with the range.
+- **An off-plane COM target breaks B2/B3 mirror symmetry**, necessarily — the
+  constraint itself is not mirror-symmetric. Candidate-trial COM targets should
+  stay on x = 0.
+- **Principal-inertia locking is an abstract probe**, not a self-consistent
+  body, and is labelled as such. No preset enables it.
+- **Rocker ballast containment uses the plan silhouette**, which over-accepts
+  near the curved underside. In practice rocker ballast sits near the centreline
+  where the approximation is tight.
+- **No simultaneous two-viewport comparison.** A saved baseline/candidate
+  workflow does the same job without complicating the engine.
+- **Nothing here measures locomotion.** Step 3 makes a fair comparison possible;
+  it does not run one.
+
+---
+
+## Steps 4–6 — not yet implemented
 
 Nothing in the code implements these yet, and this document will not describe
 them as though it does. When each lands, this file gains:
 
-- **Step 3:** precisely what matched comparison holds fixed and what it allows
-  to vary.
 - **Step 4:** how forward advance is measured and normalised.
 - **Steps 5–6:** the P1 and P3 control laws, and the conditions required before
   a result may be called "walking".

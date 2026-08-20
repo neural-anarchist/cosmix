@@ -104,9 +104,9 @@ existing simulations; the internals do not.
 Committed as the preserved baseline (`feat(walking-statues): validate static
 contact, tipping, and rope geometry`).
 
-**Phase 2: Steps 1-2 of 6 complete.** Procedural upper body and mass model
+**Phase 2: Steps 1-3 of 6 complete.** Procedural upper body and mass model
 (Step 1); twelve-family base-geometry factory on a shared parameter schema, with
-fore-aft mirror generation (Step 2). See the completion notes at the bottom of
+fore-aft mirror generation (Step 2); matched-comparison mode (Step 3). See the completion notes at the bottom of
 this file, and
 [PHASE2_GEOMETRY_AND_CONTROL.md](./PHASE2_GEOMETRY_AND_CONTROL.md) for the
 model description. Steps 2–6 have not started; per the development order this
@@ -475,3 +475,87 @@ Verified in headless Chromium against the dev server, zero console errors:
 No family has been run as a walking candidate. Step 2 built and validated the
 geometry; whether any of it changes the response to the validated rope forces is
 Step 4's question, and nothing here has measured it.
+
+---
+
+## Phase 2 — Step 3 completion notes
+
+**What shipped in Step 3:**
+
+- **Raw Geometry versus Matched Comparison**, with a permanent banner reading
+  `RAW GEOMETRY — not a controlled performance comparison`,
+  `MATCHED COMPARISON — all required locks satisfied`, or
+  `MATCHED COMPARISON INVALID — one or more constraints cannot be met`.
+- **Six named presets** — Raw Geometry, Matched Envelope, Matched Mass + COM,
+  Matched Mass + COM + Width, Matched Volume + Width, Matched Moai Candidate
+  Trial — plus sixteen individual locks in advanced mode.
+- **A read-only report table** giving every lock's target, achieved value,
+  absolute and relative error, status and **the method used**, alongside the
+  environment quantities (rope anchors and attachments, tension limit, road,
+  timestep/solver, initial pose) and the recomputed principal inertia.
+- **Internal ballast** for COM matching: a labelled mass applied through Rapier's
+  additional mass properties, so no collider changes and contact behaviour is
+  provably unaffected. Drawn in the collider overlay in its own colour with its
+  own toggle.
+- **A baseline/candidate scenario workflow** with a `comparisonGroupId` carried
+  into exports, so a later result can be tied to the exact constraints it was
+  run under.
+- **Environment drift detection**: a locked road, rope, tension or solver setting
+  changed after the baseline was captured invalidates the comparison and names
+  the quantity and both values.
+
+**Two defects found and fixed during Step 3:**
+
+- Ballast containment was tested against the statue's bounding box, which for a
+  wide-based statue is mostly empty air at shoulder height. B0's ballast was
+  placed 9 cm outside the torso and reported as internal. Containment now walks
+  the real base footprint polygon, the leaned torso box and the head sphere; the
+  bounding-box case is kept as a regression test.
+- Environment drift was recomputed only when the statue changed, so nudging the
+  road-friction slider after capturing a baseline silently invalidated a
+  comparison that still displayed as matched. Drift is now recomputed from every
+  setter that can touch a lockable quantity.
+
+**Tests: 613 total, all passing** — the 418 from Phase 1 and Steps 1-2 unchanged,
+plus 195 new across `comparison/resolve.test.ts`,
+`comparison/scenario.test.ts` and `statue/envelope.test.ts`.
+
+| Required Step 3 test | Where |
+|---|---|
+| Raw mode alters nothing | `resolve.test.ts` — every family, params and Rapier-measured mass/COM/inertia |
+| Matched mode changes only locked quantities | `resolve.test.ts` |
+| Disabling matched mode restores raw exactly | `resolve.test.ts` |
+| Width / length / height locks within tolerance | `resolve.test.ts`, all flat families |
+| W_base stays maximum width, L_base stays total length | `resolve.test.ts`, all families, two presets |
+| Mass and COM locks for A0/A2/B0/B2/B3/B5/B6 | `resolve.test.ts`, measured through Rapier |
+| Ballast positive, inside the body, no invalid density | `resolve.test.ts`, `envelope.test.ts` |
+| B2/B3 mirror preserved under every preset | `resolve.test.ts` |
+| Environmental locks (road, ropes, tension, solver, pose) | `scenario.test.ts` |
+| Invalid constraints rejected, not approximated | `resolve.test.ts` — five cases |
+
+### Manual test checklist (Step 3)
+
+Verified in headless Chromium against the dev server, zero console errors:
+
+- [x] A0 baseline captured in Raw Geometry — banner reads RAW GEOMETRY.
+- [x] B0 under Matched Mass + COM + Width — all locks MET, ballast 199.0 kg at
+      (0.241, 0, 1.648) m.
+- [x] B2 under Matched Moai Candidate Trial — all locks MET, ballast 175.6 kg at
+      x = -0.241 m.
+- [x] B3 mirrored control under the same trial — all locks MET, ballast 175.6 kg
+      at x = +0.241 m, achieved values byte-identical to B2's.
+- [x] B5 under Matched Envelope — INVALID, naming the unreachable base height and
+      the range B5 can actually produce (0.595-1.619 m).
+- [x] A4 under Matched Envelope — INVALID, "a cylindrical rocker is as tall as it
+      is wide".
+- [x] Ballast marker visible in the collider overlay, distinct from the COM
+      marker, with a working toggle.
+- [x] Scenario workflow: capture baseline and candidate, switch away, load each
+      back — statue and environment restored, shared configuration retained.
+- [x] Environment drift: changing road friction after capture flips the banner to
+      INVALID and names the quantity.
+
+### What Step 3 did not do
+
+It runs no experiments, measures no displacement, applies no control, and says
+nothing about walking. It makes a fair comparison possible.

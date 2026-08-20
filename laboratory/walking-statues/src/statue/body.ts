@@ -3,7 +3,7 @@ import type { RapierModule } from "../physics/rapierSetup";
 import type { Vec3 } from "../core/vec3";
 import { getBaseModule } from "./bases/registry";
 import { computeStatueGeometry, type StatueGeometry } from "./geometry";
-import type { StatueParams } from "./types";
+import type { BallastSpec, StatueParams } from "./types";
 
 /** Which compound component a collider belongs to, so the overlay can label and
  * colour each one and diagnostics can report them separately. */
@@ -50,6 +50,8 @@ export interface ComponentMassReport {
 
 export interface StatueMassReport {
   massKg: number;
+  /** The matched-comparison ballast actually applied, or null. */
+  ballast: BallastSpec | null;
   comLocal: Vec3;
   principalInertia: Vec3;
   /** True when the derived mass properties were replaced by an explicit COM. */
@@ -198,6 +200,8 @@ export function createStatueBody(
 
   if (geometry.comOverrideLocal) {
     applyComOverride(rigidBody, colliders, params.totalMassKg, geometry.comOverrideLocal);
+  } else if (params.ballast) {
+    applyBallast(rigidBody, params.ballast);
   }
 
   const comLocal = rigidBody.localCom();
@@ -233,10 +237,39 @@ export function createStatueBody(
       comLocal: { x: comLocal.x, y: comLocal.y, z: comLocal.z },
       principalInertia: { x: principal.x, y: principal.y, z: principal.z },
       comOverridden: geometry.comOverrideLocal !== null,
+      ballast: geometry.comOverrideLocal ? null : (params.ballast ?? null),
       components,
       comLocalAnalytic: geometry.comLocalAnalytic
     }
   };
+}
+
+/**
+ * Adds an explicitly labelled internal ballast mass.
+ *
+ * Applied through Rapier's *additional* mass properties, which are summed with
+ * the properties derived from the colliders. No collider is added, moved,
+ * resized or re-densified, so the contact behaviour of a ballasted statue is
+ * provably identical to the same statue without ballast — the only thing that
+ * changes is where its mass sits. That is precisely why matched-comparison mode
+ * prefers this over the abstract COM override: the result is a real rigid body
+ * with a real mass distribution, not a probe.
+ *
+ * The ballast carries no rotational inertia of its own — it is treated as a
+ * point mass — so its whole contribution to the inertia tensor comes from the
+ * parallel-axis term of its offset, which Rapier applies. A point mass is the
+ * conservative choice: giving it a fabricated spread would silently change the
+ * rocking dynamics a comparison is trying to hold fixed.
+ */
+function applyBallast(rigidBody: RAPIER.RigidBody, ballast: BallastSpec): void {
+  rigidBody.setAdditionalMassProperties(
+    ballast.massKg,
+    ballast.localPosition,
+    { x: 0, y: 0, z: 0 },
+    { x: 0, y: 0, z: 0, w: 1 },
+    true
+  );
+  rigidBody.recomputeMassPropertiesFromColliders();
 }
 
 /**

@@ -169,6 +169,7 @@ export class SimulationEngine {
   private held: RopeHoldState = { leftHeld: false, rightHeld: false };
 
   private showColliders = false;
+  private showBallast = true;
   private showComMarker = true;
 
   private accumulatorS = 0;
@@ -304,6 +305,7 @@ export class SimulationEngine {
       this.roadParams.restitution
     );
     this.statue.colliderVisual.visible = this.showColliders;
+    if (this.statue.ballastMarker) this.statue.ballastMarker.visible = this.showBallast;
     this.statue.comMarker.visible = this.showComMarker;
 
     const t = this.statue.rigidBody.translation();
@@ -370,6 +372,11 @@ export class SimulationEngine {
   setShowComMarker(visible: boolean): void {
     this.showComMarker = visible;
     if (this.statue) this.statue.comMarker.visible = visible;
+  }
+
+  setShowBallast(visible: boolean): void {
+    this.showBallast = visible;
+    if (this.statue?.ballastMarker) this.statue.ballastMarker.visible = visible;
   }
 
   setRopeHeld(side: "left" | "right", held: boolean): void {

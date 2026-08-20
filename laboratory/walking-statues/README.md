@@ -5,7 +5,7 @@ rigid statue advance by controlled side-to-side rocking? Forward motion is
 never scripted here — it has to emerge from rigid-body dynamics, gravity,
 ground contact, friction, and rope forces, or it doesn't happen at all.
 
-**Status: Phase 2, Steps 1-2 of 6** (Phase 1 complete and validated). App shell,
+**Status: Phase 2, Steps 1-3 of 6** (Phase 1 complete and validated). App shell,
 flat road, a free rigid-body statue with twelve base geometries on a shared
 parameter schema, an explicit rope-anchor model, validated static
 equilibrium, and a physics diagnostics panel. See [PLAN.md](./PLAN.md) for the
@@ -24,9 +24,10 @@ equilibrium, sliding, and lateral rocking. It does *not* demonstrate directed
 forward walking, and a symmetric base on a symmetric flat road is not expected
 to: measured forward progress is 0.15 mm against 0.63 m of lateral motion.
 Directed walking needs fore-aft asymmetric geometry and asymmetric contact
-transfer. Phase 2 Step 2 has now *built* that geometry, but has not run it as a
-walking candidate — whether any of it changes the response to the validated rope
-forces is a later step's question, and nothing has measured it yet.
+transfer. Phase 2 has now *built* that geometry (Step 2) and the infrastructure
+to compare it fairly (Step 3), but has not run any of it as a walking candidate —
+whether base geometry changes the response to the validated rope forces is a
+later step's question, and nothing has measured it yet.
 
 ## Setup
 
@@ -59,6 +60,14 @@ npm test            # unit tests (vitest)
   are visibly disabled rather than silently ignored. B2 and B3 are an exact
   fore-aft mirrored pair, generated one from the other so a mirrored control
   trial is a real control.
+- **Matched-comparison mode**, so a candidate family cannot look better merely
+  by being heavier, wider, lower-slung or given more rope. Six named presets
+  hold chosen quantities equal across a family switch; a table reports every
+  lock's target, achieved value, error and the method used; a constraint that
+  cannot be met marks the comparison invalid and says why rather than
+  approximating. Centre-of-mass matching uses a visible internal ballast mass
+  rather than an abstract override — see
+  [MATCHED_COMPARISON_GUIDE.md](./MATCHED_COMPARISON_GUIDE.md).
 - A mass model with real mechanical parameters: torso taper, intrinsic forward
   lean of the upper body (reported separately from dynamic pitch), and an
   optional explicit COM override for abstract sweeps. Mass, COM and inertia are

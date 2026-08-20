@@ -146,6 +146,10 @@ export function definePolytopeFamily(spec: PolytopeFamilySpec): BaseGeometryModu
         footprintAreaM2: shape.footprint ? footprintArea(shape.footprint) : null,
         mountLeanRad: shape.mountLeanRad,
         offsetX: spec.usesParameters.includes("baseOffsetXRatio") ? resolved.offsetX : 0,
+        minX: bounds.minX,
+        maxX: bounds.maxX,
+        minY: bounds.minY,
+        maxY: bounds.maxY,
         comLocal: polytopeCentroid(shape.polytope)
       };
     },

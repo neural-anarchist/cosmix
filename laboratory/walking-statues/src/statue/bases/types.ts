@@ -70,6 +70,16 @@ export interface BaseDims {
   /** Fore-aft offset of the base relative to the upper body, meters. */
   offsetX: number;
   /**
+   * Plan-view extremes in body-local coordinates. Not derivable from
+   * `lengthX`/`widthY` alone: an asymmetric outline does not straddle the origin
+   * evenly, and an offset base does not straddle it at all. The matched-comparison
+   * ballast envelope needs to know where the base actually reaches.
+   */
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  /**
    * The base's own centre of mass, body-local, assuming uniform density.
    *
    * Not assumed to be `(0, 0, topZ/2)`: that holds for a prism and for a lying

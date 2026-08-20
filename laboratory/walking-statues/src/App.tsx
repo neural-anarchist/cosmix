@@ -1,5 +1,6 @@
 import { BaselineNotice } from "./ui/BaselineNotice";
 import { BenchmarkPanel } from "./ui/BenchmarkPanel";
+import { ComparisonPanel } from "./ui/ComparisonPanel";
 import { ControlPanel } from "./ui/ControlPanel";
 import { DiagnosticsPanel } from "./ui/DiagnosticsPanel";
 import { ReadoutPanel } from "./ui/ReadoutPanel";
@@ -54,6 +55,9 @@ export function App() {
         <div className="controls">
           <RopeControls />
           <BenchmarkPanel />
+        </div>
+        <div className="controls">
+          <ComparisonPanel />
         </div>
         <ControlPanel />
       </section>

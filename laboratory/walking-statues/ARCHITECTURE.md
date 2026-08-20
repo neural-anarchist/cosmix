@@ -88,7 +88,10 @@ src/
                         placements, analytic COM, COM override, default
                         rope attachments                                  [headless]
     body.ts             the compound rigid body + colliders, per-component
-                        labelling, and the explicit COM override          [headless]
+                        labelling, the explicit COM override, and the
+                        matched-comparison ballast                        [headless]
+    envelope.ts         "is this point inside the statue?" - the real test,
+                        not the bounding box                              [headless]
     procedural.ts       Moai display geometry from primitives only
     factory.ts          body.ts + display meshes, per-component collider
                         overlay, COM marker
@@ -111,6 +114,13 @@ src/
                         preserved unchanged from validated Phase 1
       flatFamilies.ts   A1 A2 A3 B0 B2 B3 B4 B6
       rockerFamilies.ts A5 B5
+  comparison/
+    types.ts            locks, tolerances, lock reports, resolution shape  [headless]
+    presets.ts          the six named presets and what each one locks      [headless]
+    solve.ts            one-dimensional bracket-and-bisect solver          [headless]
+    ballast.ts          places an internal ballast mass, or rejects        [headless]
+    resolve.ts          raw params + locks -> statue to build + full report [headless]
+    scenario.ts         baseline/candidate capture, environment drift      [headless]
   control/
     ropeModel.ts        two-point rope geometry -> direction, force, torque [headless]
     ropeDefaults.ts     default haul geometry; purely-lateral arrangement   [headless]
@@ -264,6 +274,49 @@ of validation against A0 could not have caught it, and the regression that now
 guards it is written on the observable — a statue with no forces applied must not
 move — rather than on any internal detail.
 
+## Matched comparison
+
+Switching base family changes more than the shape: it changes base volume, and
+with it mass distribution, centre of mass and inertia. Any claim that one family
+performs better therefore needs the other differences removed first, which is
+what `comparison/` does.
+
+The whole module is **headless and pure**: `resolveMatchedComparison(rawParams,
+config)` returns the statue that should actually be built plus a full account of
+what was and was not achieved. No Rapier, no Three.js, no store. That is what
+lets every normalization claim be unit-tested directly, which matters more here
+than anywhere else in the project — the value of a matched comparison rests
+entirely on the matching being exact.
+
+The resolution is consumed through `selectResolution`, so the viewport builds the
+*normalized* statue rather than the raw one. The selector is memoised on the
+identity of its inputs, which is a correctness requirement rather than an
+optimisation: a Zustand selector returning a fresh object every call never
+compares equal to itself, and React re-renders until it gives up.
+
+Three design decisions carry most of the weight:
+
+- **Ballast is a mass, not a shape.** It goes in through Rapier's *additional*
+  mass properties, which are summed with the collider-derived ones. No collider
+  is added, moved or resized, so contact behaviour is provably unchanged.
+- **Containment is tested against the body, not its bounding box.** A
+  wide-based statue's bounding box is mostly air at shoulder height;
+  `statue/envelope.ts` walks the real base footprint polygon, the leaned torso
+  box and the head sphere.
+- **Geometric locks are solved numerically** against each family's own `dims()`
+  rather than by per-family algebra. Twelve families derive volume and height in
+  twelve ways, and twelve hand-derived inverses would be twelve chances to be
+  subtly wrong in a way that still produced plausible numbers.
+
+Environment locks are different in kind: road, ropes, tension and solver are not
+derived from the statue, so "locking" them is a *check that they did not move*
+rather than a normalization. `environmentDifferences` reports any drift from the
+captured baseline, and it is recomputed from every setter that can touch a
+lockable quantity — a comparison invalidated by a friction slider nudged after
+capture is exactly the failure it exists to catch.
+
+See MATCHED_COMPARISON_GUIDE.md.
+
 ## Rope model
 
 A rope is two points and nothing else: an external anchor fixed in the world
@@ -286,8 +339,6 @@ Named here so it's unambiguous rather than discovered by absence:
 
 - No pulling *protocols* (P0–P5) — only direct manual hold-to-pull forces.
   P1/P3 land in Phase 2 Steps 5 and 6.
-- No matched-comparison mode, so switching base family does not yet hold mass,
-  COM and footprint fixed (Phase 2 Step 3).
 - No road types beyond flat.
 - No charts, no time-series recording, no energy/work accounting, no presets,
   no export, no sweeps, no calibration.

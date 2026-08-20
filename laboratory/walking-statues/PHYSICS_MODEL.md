@@ -142,8 +142,7 @@ physics. This file is updated as each lands, not rewritten at the end.
   walking would actually require now exist (Phase 2 Step 2), but **none has been
   run as a walking candidate** — building the geometry is not measuring it, and
   no result obtained so far has done so.
-- Everything under Calibration mode, batch sweeps, matched-comparison mode,
-  and export.
+- Everything under Calibration mode and batch sweeps.
 
 ## Static thresholds, and what the benchmarks actually check
 
@@ -220,6 +219,29 @@ clamp, and not a position lock: with the reset in place the statue holds
 static equilibrium at 95% of its tipping threshold **with damping set to
 zero**. Full audit, including everything that was ruled out, in
 [PHASE1_FORCE_CONTACT_AUDIT.md](./PHASE1_FORCE_CONTACT_AUDIT.md).
+
+## Matched comparison: what is normalized, and what that costs
+
+Phase 2 Step 3 added a controlled comparison mode. Two points belong in the
+physics record rather than only in the guide:
+
+- **Internal ballast is a mass, not a shape.** It is applied through Rapier's
+  *additional* mass properties, which are summed with the collider-derived ones.
+  No collider is added, moved, resized or re-densified, so a ballasted statue's
+  contact behaviour is provably identical to the same statue without it. The
+  ballast carries no rotational inertia of its own — it is a point mass, so its
+  entire contribution to the inertia tensor is the parallel-axis term of its
+  offset. Giving it a fabricated spread would silently change the rocking
+  dynamics a comparison is trying to hold fixed.
+- **Some quantities genuinely cannot be matched.** A cylindrical rocker is as
+  tall as it is wide; a fore-aft rocker's height is its lateral radius plus its
+  fore-aft rise. Locking base height alongside width over-constrains both, and
+  the app reports the scenario invalid with the reachable range rather than
+  approximating. Matching mass, COM *and* principal inertia across unlike shapes
+  requires an internal mass distribution no real arrangement of the statue's
+  material would produce, and is labelled an abstract probe when used.
+
+See MATCHED_COMPARISON_GUIDE.md.
 
 ## A genuine finding from Phase 2: a flat hull can collapse its own contact patch
 

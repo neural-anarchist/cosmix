@@ -63,6 +63,10 @@ export const a4LateralRocker: BaseGeometryModule = {
       footprintAreaM2: null,
       mountLeanRad: 0,
       offsetX: 0,
+      minX: -(params.baseLengthRatio * H) / 2,
+      maxX: (params.baseLengthRatio * H) / 2,
+      minY: -radius,
+      maxY: radius,
       // A cylinder lying on its side has its centroid on the axis, one radius
       // up — which for this family is also half of topZ.
       comLocal: { x: 0, y: 0, z: radius }

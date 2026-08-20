@@ -52,6 +52,10 @@ export const a0FlatRect: BaseGeometryModule = {
       footprintAreaM2: lengthX * widthY,
       mountLeanRad: 0,
       offsetX: 0,
+      minX: -lengthX / 2,
+      maxX: lengthX / 2,
+      minY: -widthY / 2,
+      maxY: widthY / 2,
       // A uniform rectangular prism's centroid is at half its height.
       comLocal: { x: 0, y: 0, z: heightZ / 2 }
     };

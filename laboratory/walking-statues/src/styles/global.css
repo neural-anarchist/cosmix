@@ -1048,3 +1048,104 @@ input[type="range"]::-moz-range-thumb {
   font-size: 0.75rem;
   color: var(--gold);
 }
+
+
+/* ---- Matched-comparison panel -------------------------------------------
+   The banner is the load-bearing element: a reader glancing at a result must
+   be able to tell at once whether it came from a controlled comparison or not,
+   without reading the table underneath. */
+.comparison-panel { grid-column: 1 / -1; }
+
+.comparison-banner {
+  margin: 0 0 0.75rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.comparison-banner.is-raw {
+  color: var(--gold);
+  border-color: rgb(215 180 112 / 45%);
+  background: rgb(215 180 112 / 10%);
+}
+.comparison-banner.is-matched {
+  color: #6fd08c;
+  border-color: rgb(111 208 140 / 45%);
+  background: rgb(111 208 140 / 10%);
+}
+.comparison-banner.is-invalid {
+  color: var(--rust, #d68c70);
+  border-color: rgb(214 140 112 / 55%);
+  background: rgb(214 140 112 / 12%);
+}
+
+.comparison-abstract {
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.7rem;
+  border-left: 3px solid #9b6bff;
+  background: rgb(155 107 255 / 10%);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.comparison-problems {
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.7rem 0.5rem 1.6rem;
+  border-left: 3px solid var(--rust, #d68c70);
+  background: rgb(214 140 112 / 8%);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+.comparison-problems li + li { margin-top: 0.4rem; }
+
+.comparison-scenarios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.6rem 0 0.4rem;
+}
+
+.comparison-locks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 0.75rem;
+  margin: 0.5rem 0 0.75rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.comparison-locks h4 {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+}
+
+/* Wide tables scroll inside their own container rather than pushing the page
+   sideways. */
+.comparison-table {
+  display: block;
+  overflow-x: auto;
+  width: 100%;
+  margin-top: 0.75rem;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.comparison-table th,
+.comparison-table td {
+  padding: 0.3rem 0.55rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  white-space: nowrap;
+}
+.comparison-table th { opacity: 0.7; font-weight: 600; }
+.comparison-table .num { text-align: right; }
+.comparison-table tr.status-met td:nth-child(5) { color: #6fd08c; }
+.comparison-table tr.status-violated td { background: rgb(214 140 112 / 10%); }
+.comparison-table tr.status-violated td:nth-child(5) { color: var(--rust, #d68c70); font-weight: 600; }
+.comparison-table tr.status-unlocked td { opacity: 0.6; }
+.comparison-table tr.status-not_applicable td:nth-child(5) { color: #9b6bff; }

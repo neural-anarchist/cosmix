@@ -12,6 +12,11 @@ const COM_MARKER_MATERIAL = new THREE.MeshBasicMaterial({ color: 0xd7b470 });
 /** An overridden COM is an abstract probe rather than a derived property, so it
  * is drawn in a different colour to stop it reading as a measurement. */
 const COM_OVERRIDE_MATERIAL = new THREE.MeshBasicMaterial({ color: 0x9b6bff });
+/** Matched-comparison ballast. Drawn in its own colour and only in the collider
+ * overlay: a normalised statue must never look identical to an un-normalised
+ * one, because the difference between them is the whole basis of a comparison. */
+const BALLAST_MATERIAL = new THREE.MeshBasicMaterial({ color: 0x6fd08c, wireframe: true, transparent: true, opacity: 0.9 });
+const BALLAST_MARKER_MIN_RADIUS_M = 0.06;
 
 /**
  * One wireframe colour per compound component, so the collider overlay answers
@@ -124,6 +129,23 @@ export function createStatue(
   applyPlacement(headWire, headPlacement);
   colliderVisual.add(headWire);
 
+  let ballastMarker: THREE.Object3D | null = null;
+  // Ballast is a mass, not a shape — it adds no collider — so it is drawn as a
+  // marker sized by how much mass it carries, at the point that mass acts.
+  if (body.mass.ballast) {
+    const fraction = body.mass.ballast.massKg / Math.max(1, geometry.totalMassWithBallastKg);
+    const radius = BALLAST_MARKER_MIN_RADIUS_M + 0.5 * fraction * geometry.base.widthY;
+    const marker = new THREE.Mesh(new THREE.SphereGeometry(radius, 14, 10), BALLAST_MATERIAL);
+    marker.position.set(
+      body.mass.ballast.localPosition.x,
+      body.mass.ballast.localPosition.y,
+      body.mass.ballast.localPosition.z
+    );
+    marker.name = "statue-ballast-marker";
+    colliderVisual.add(marker);
+    ballastMarker = marker;
+  }
+
   scene.add(colliderVisual);
 
   const comMarker = new THREE.Mesh(
@@ -136,6 +158,7 @@ export function createStatue(
   return {
     visual,
     colliderVisual,
+    ballastMarker,
     comMarker,
     rigidBody: body.rigidBody,
     colliders: body.colliders,

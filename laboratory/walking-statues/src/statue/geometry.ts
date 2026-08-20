@@ -111,6 +111,25 @@ export interface StatueGeometry {
   comHeightAnalyticM: number;
   /** Explicit COM to force, body-local, or null when not overriding. */
   comOverrideLocal: Vec3 | null;
+  /**
+   * Total mass including any matched-comparison ballast. Equals
+   * `totalMassKg` whenever no ballast is present, which is every raw-geometry
+   * configuration.
+   */
+  totalMassWithBallastKg: number;
+  /**
+   * COM of the geometry *plus* ballast. Identical to `comLocalAnalytic` with no
+   * ballast. Kept separate so `comLocalAnalytic` keeps meaning "what the shape
+   * and its densities imply", which is what the cross-check against Rapier in
+   * the unit tests is actually testing.
+   */
+  comLocalTotalAnalytic: Vec3;
+  /**
+   * Axis-aligned body-local box enclosing every collider. Matched-comparison
+   * ballast must sit inside it; a COM target that would push it outside is
+   * rejected rather than approximated.
+   */
+  envelope: { min: Vec3; max: Vec3 };
   /** Default rope attachment points in body-local coordinates, post-lean. */
   defaultAttachment: { left: Vec3; right: Vec3 };
 }
@@ -263,6 +282,19 @@ export function computeStatueGeometry(params: StatueParams): StatueGeometry {
   const attachLeft = applyLean({ x: 0, y: attachHalfWidth, z: attachUnleanedZ }, leanPivot, leanRotation);
   const attachRight = applyLean({ x: 0, y: -attachHalfWidth, z: attachUnleanedZ }, leanPivot, leanRotation);
 
+  // ---- Ballast, and the envelope it is required to stay inside.
+  const ballast = params.ballast;
+  const totalMassWithBallastKg = M + (ballast ? ballast.massKg : 0);
+  const comLocalTotalAnalytic: Vec3 = ballast
+    ? {
+        x: (M * comLocalAnalytic.x + ballast.massKg * ballast.localPosition.x) / totalMassWithBallastKg,
+        y: (M * comLocalAnalytic.y + ballast.massKg * ballast.localPosition.y) / totalMassWithBallastKg,
+        z: (M * comLocalAnalytic.z + ballast.massKg * ballast.localPosition.z) / totalMassWithBallastKg
+      }
+    : comLocalAnalytic;
+
+  const envelope = computeEnvelope(base, torso, head, torsoPlacement, headPlacement);
+
   return {
     heightM: H,
     totalMassKg: M,
@@ -278,6 +310,72 @@ export function computeStatueGeometry(params: StatueParams): StatueGeometry {
     comLocalAnalytic,
     comHeightAnalyticM: comLocalAnalytic.z,
     comOverrideLocal,
+    totalMassWithBallastKg,
+    comLocalTotalAnalytic,
+    envelope,
     defaultAttachment: { left: attachLeft, right: attachRight }
+  };
+}
+
+/**
+ * Axis-aligned body-local box enclosing the base, torso and head colliders.
+ *
+ * The torso is leaned, so its eight corners are transformed individually rather
+ * than its extents being taken about its centre — an assumption that would
+ * under-report the envelope exactly where a leaning statue reaches furthest, and
+ * so would let ballast be placed outside the body it is supposed to be inside.
+ */
+function computeEnvelope(
+  base: BaseDims,
+  torso: TorsoGeometry,
+  head: HeadGeometry,
+  torsoPlacement: Placement,
+  headPlacement: Placement
+): { min: Vec3; max: Vec3 } {
+  const points: Vec3[] = [
+    { x: base.minX, y: base.minY, z: 0 },
+    { x: base.maxX, y: base.maxY, z: base.topZ }
+  ];
+
+  const hx = torso.depthX / 2;
+  const hy = torso.widthY / 2;
+  const hz = torso.heightZ / 2;
+  for (const sx of [-1, 1]) {
+    for (const sy of [-1, 1]) {
+      for (const sz of [-1, 1]) {
+        const corner = rotateByQuat({ x: sx * hx, y: sy * hy, z: sz * hz }, torsoPlacement.rotation);
+        points.push({
+          x: corner.x + torsoPlacement.position.x,
+          y: corner.y + torsoPlacement.position.y,
+          z: corner.z + torsoPlacement.position.z
+        });
+      }
+    }
+  }
+
+  points.push(
+    {
+      x: headPlacement.position.x - head.radius,
+      y: headPlacement.position.y - head.radius,
+      z: headPlacement.position.z - head.radius
+    },
+    {
+      x: headPlacement.position.x + head.radius,
+      y: headPlacement.position.y + head.radius,
+      z: headPlacement.position.z + head.radius
+    }
+  );
+
+  return {
+    min: {
+      x: Math.min(...points.map((p) => p.x)),
+      y: Math.min(...points.map((p) => p.y)),
+      z: Math.min(...points.map((p) => p.z))
+    },
+    max: {
+      x: Math.max(...points.map((p) => p.x)),
+      y: Math.max(...points.map((p) => p.y)),
+      z: Math.max(...points.map((p) => p.z))
+    }
   };
 }

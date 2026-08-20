@@ -48,6 +48,8 @@ export const PHASE1_BASELINE_STATUE_PARAMS: StatueParams = {
 
   visualDetail: "medium",
 
+  ballast: null,
+
   linearDampingSI: 0.05,
   angularDampingSI: 0.15
 };
