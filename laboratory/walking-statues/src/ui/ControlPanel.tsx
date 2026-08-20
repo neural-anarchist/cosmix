@@ -1,16 +1,63 @@
-import { ALL_BASE_FAMILY_IDS, isBaseFamilyImplemented } from "../statue/bases/registry";
+import {
+  ALL_BASE_FAMILY_IDS,
+  foreAftMirrorFamily,
+  getBaseModule,
+  SYMMETRIC_BASE_FAMILY_IDS
+} from "../statue/bases/registry";
+import { SHARED_BASE_PARAM_RANGES, type SharedBaseParameterId } from "../statue/bases/shared";
 import { useSimStore } from "../state/store";
-import type { BaseFamilyId, VisualDetail } from "../statue/types";
+import type { BaseFamilyId, StatueParams, VisualDetail } from "../statue/types";
 import { SliderField } from "./SliderField";
 
-const BASE_FAMILY_LABELS: Record<BaseFamilyId, string> = {
-  A0: "A0 — Flat rectangular prism",
-  A4: "A4 — Lateral cylindrical rocker",
-  A5: "A5 — Ellipsoidal rocker (Phase 2)",
-  B0: "B0 — D-shaped base (Phase 2)",
-  B2: "B2 — Forward teardrop (Phase 2)",
-  B6: "B6 — Moai D-base + lean (Phase 2)"
-};
+/**
+ * The shared base-parameter schema as the UI renders it. Every family gets the
+ * same controls in the same order; a family that does not read a parameter has
+ * it disabled with the reason shown, rather than the control quietly doing
+ * nothing. Ranges come from the schema so a slider and its validator cannot
+ * disagree.
+ */
+const BASE_PARAM_FIELDS: {
+  id: SharedBaseParameterId;
+  label: string;
+  step: number;
+  title: string;
+}[] = [
+  { id: "baseWidthRatio", label: "Base width W/H", step: 0.01, title: "W_base / H — maximum lateral extent." },
+  { id: "baseLengthRatio", label: "Base length L/H", step: 0.01, title: "L_base / H — fore-aft extent." },
+  { id: "baseHeightRatio", label: "Base height H_b/H", step: 0.01, title: "H_base / H." },
+  {
+    id: "baseLateralRadiusRatio",
+    label: "Lateral curvature R_lat/H",
+    step: 0.01,
+    title: "Lateral rolling radius. For A4 and B5 this is defined as W/2 and the control is inactive."
+  },
+  {
+    id: "baseForeAftRadiusRatio",
+    label: "Fore-aft curvature R_fore/H",
+    step: 0.01,
+    title: "Teardrop tail radius (B2/B3) or fore-aft rolling radius at contact (B5)."
+  },
+  { id: "baseEdgeRoundingRatio", label: "Edge rounding r/H", step: 0.005, title: "Plan-corner rounding radius." },
+  {
+    id: "baseFrontBackAsymmetry",
+    label: "Front/back asymmetry",
+    step: 0.02,
+    title: "Splits the fore-aft length as (L/2)(1 ± f). Total length is preserved."
+  },
+  {
+    id: "baseLeftRightAsymmetry",
+    label: "Left/right asymmetry",
+    step: 0.02,
+    title: "Splits the lateral width as (W/2)(1 ± a). Maximum width is preserved."
+  },
+  { id: "baseOffsetXRatio", label: "Base x-offset / H", step: 0.005, title: "Shifts the base fore or aft under the upper body." },
+  {
+    id: "baseForwardLeanDeg",
+    label: "Base mount lean",
+    step: 0.5,
+    title: "Angle the base's top face is cut at. Leans the upper body without tilting the footprint."
+  }
+];
 
 export function ControlPanel() {
   const statueParams = useSimStore((s) => s.statueParams);
@@ -21,7 +68,9 @@ export function ControlPanel() {
   const resetRoadParams = useSimStore((s) => s.resetRoadParams);
   const readout = useSimStore((s) => s.readout);
 
-  const isA4 = statueParams.baseFamily === "A4";
+  const baseModule = getBaseModule(statueParams.baseFamily);
+  const isSymmetricFamily = SYMMETRIC_BASE_FAMILY_IDS.includes(statueParams.baseFamily);
+  const mirrorFamily = foreAftMirrorFamily(statueParams.baseFamily);
 
   return (
     <div className="controls">
@@ -199,58 +248,71 @@ export function ControlPanel() {
       <div className="control-card">
         <h3>Base geometry</h3>
         <div className="field">
-          <label title="Base family — only A0 and A4 are implemented in Phase 1.">
+          <label title="Base family. A-series are symmetric validation shapes; B-series are the fore-aft asymmetric candidates.">
             <span>Base family</span>
           </label>
           <select
             value={statueParams.baseFamily}
             onChange={(e) => setStatueParams({ baseFamily: e.target.value as BaseFamilyId })}
           >
-            {ALL_BASE_FAMILY_IDS.map((id) => (
-              <option key={id} value={id} disabled={!isBaseFamilyImplemented(id)}>
-                {BASE_FAMILY_LABELS[id]}
-              </option>
-            ))}
+            <optgroup label="A — symmetric (validation / reference)">
+              {ALL_BASE_FAMILY_IDS.filter((id) => SYMMETRIC_BASE_FAMILY_IDS.includes(id)).map((id) => (
+                <option key={id} value={id}>
+                  {getBaseModule(id).label}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="B — fore-aft asymmetric (candidates)">
+              {ALL_BASE_FAMILY_IDS.filter((id) => !SYMMETRIC_BASE_FAMILY_IDS.includes(id)).map((id) => (
+                <option key={id} value={id}>
+                  {getBaseModule(id).label}
+                </option>
+              ))}
+            </optgroup>
           </select>
         </div>
-        <SliderField
-          label={isA4 ? "Rocker diameter / H" : "Base width / H"}
-          value={statueParams.baseWidthRatio}
-          min={0.12}
-          max={0.6}
-          step={0.01}
-          onChange={(v) => setStatueParams({ baseWidthRatio: v })}
-          title="W_base / H (A4: full rocker diameter along y)."
-        />
-        <SliderField
-          label="Base length / H"
-          value={statueParams.baseLengthRatio}
-          min={0.1}
-          max={0.5}
-          step={0.01}
-          onChange={(v) => setStatueParams({ baseLengthRatio: v })}
-          title="L_base / H, extent along x (forward)."
-        />
-        <SliderField
-          label="Base height / H"
-          value={statueParams.baseHeightRatio}
-          min={0.06}
-          max={0.35}
-          step={0.01}
-          onChange={(v) => setStatueParams({ baseHeightRatio: v })}
-          disabled={isA4}
-          title={
-            isA4
-              ? "Not used by A4 — a cylinder's height is fixed by its radius (rocker diameter, above)."
-              : "H_base / H."
-          }
-        />
-        {isA4 && (
+
+        <p className="hint">{baseModule.summary}</p>
+
+        {isSymmetricFamily ? (
           <p className="hint">
-            Base height is disabled for A4: a cylindrical rocker's height equals its
-            diameter, so it is set entirely by the rocker-diameter control above.
+            This is a <strong>symmetric</strong> family. On a flat symmetric road under
+            symmetric forcing it has no mechanism by which to prefer a direction, so it
+            is a validation model, not a walking candidate.
+          </p>
+        ) : (
+          <p className="hint">
+            Fore-aft asymmetric family.{" "}
+            {mirrorFamily
+              ? `Its exact fore-aft mirror control is ${mirrorFamily}.`
+              : "No exact fore-aft mirror exists for this outline in Phase 2 — a mirrored control trial is not available for it."}
           </p>
         )}
+
+        {BASE_PARAM_FIELDS.map((field) => {
+          const used = baseModule.usesParameters.includes(field.id);
+          const range = SHARED_BASE_PARAM_RANGES[field.id];
+          return (
+            <SliderField
+              key={field.id}
+              label={field.label}
+              value={statueParams[field.id]}
+              min={range.min}
+              max={range.max}
+              step={field.step}
+              disabled={!used}
+              onChange={(v) => setStatueParams({ [field.id]: v } as Partial<StatueParams>)}
+              title={used ? field.title : `Not read by ${baseModule.id}. ${field.title}`}
+            />
+          );
+        })}
+
+        <p className="hint">
+          Greyed-out controls are ones this family does not read — the shared schema is
+          the same for every base, but a cylinder has no separate lateral radius and a
+          rectangle has no tail. Whether a parameter is used is declared by the family
+          itself and listed in the diagnostics panel, so nothing is silently ignored.
+        </p>
       </div>
 
       <div className="control-card">

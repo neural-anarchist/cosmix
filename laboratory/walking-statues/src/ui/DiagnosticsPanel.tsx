@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Vec3 } from "../core/vec3";
 import { REGIME_DESCRIPTION } from "../diagnostics/regime";
+import { SHARED_BASE_PARAMETERS } from "../statue/bases/shared";
 import { DEFAULT_REST_TOLERANCES } from "../diagnostics/tolerances";
 import { useSimStore } from "../state/store";
 import { SideViewDiagram } from "./diagrams/SideViewDiagram";
@@ -90,6 +91,16 @@ export function DiagnosticsPanel() {
                   note="geometry parameter, not a result"
                 />
                 <Row
+                  label="— from the body"
+                  value={`${fmt(readout.bodyLeanDeg, 2)}°`}
+                  note="upper body leaned on a level base"
+                />
+                <Row
+                  label="— from the base"
+                  value={`${fmt(readout.baseMountLeanDeg, 2)}°`}
+                  note="base's top face cut at an angle; footprint unaffected"
+                />
+                <Row
                   label="Dynamic pitch"
                   value={`${fmt(readout.pitchDeg, 3)}°`}
                   note="live simulated fore-aft tilt"
@@ -115,6 +126,76 @@ export function DiagnosticsPanel() {
                 ))}
               </DiagGroup>
 
+              <DiagGroup title="Base geometry">
+                <Row
+                  label="Fore-aft symmetry"
+                  value={readout.baseIsSymmetric ? "symmetric" : "asymmetric"}
+                  note={
+                    readout.baseIsSymmetric
+                      ? "validation model: no mechanism to prefer a direction"
+                      : readout.baseMirrorFamily
+                        ? `mirror control available: ${readout.baseMirrorFamily}`
+                        : "NO EXACT MIRROR CONTROL — a mirrored trial is unavailable for this outline"
+                  }
+                  flag={!readout.baseIsSymmetric && readout.baseMirrorFamily === null}
+                />
+                <Row label="Contact kind" value={readout.contactKind} />
+                <Row
+                  label="Length x width (m)"
+                  value={`${fmt(readout.baseGeometry.lengthXM, 3)} x ${fmt(readout.baseGeometry.widthYM, 3)}`}
+                />
+                <Row label="Top of base (m)" value={fmt(readout.baseGeometry.topZM, 3)} />
+                <Row label="Solid volume (m³)" value={fmt(readout.baseGeometry.volumeM3, 5)} />
+                <Row
+                  label="Footprint area (m²)"
+                  value={
+                    readout.baseGeometry.footprintAreaM2 === null
+                      ? "n/a"
+                      : fmt(readout.baseGeometry.footprintAreaM2, 5)
+                  }
+                  note={readout.baseGeometry.footprintAreaM2 === null ? "rocker: line contact" : undefined}
+                />
+                <Row
+                  label="Tipping arm b, left / right (m)"
+                  value={`${fmt(readout.baseGeometry.contactHalfWidthYLeftM, 3)} / ${fmt(readout.baseGeometry.contactHalfWidthYRightM, 3)}`}
+                  note="the smaller arm governs the static threshold"
+                />
+                <Row label="Base x-offset (m)" value={fmt(readout.baseGeometry.offsetXM, 3)} />
+                <Row label="Base centroid (body-local, m)" value={fmtVec(readout.baseGeometry.comLocal, 3)} />
+                <Row
+                  label="Parameters this family reads"
+                  value={`${readout.baseUsesParameters.length} of ${SHARED_BASE_PARAMETERS.length}`}
+                  note={SHARED_BASE_PARAMETERS.filter((p) => readout.baseUsesParameters.includes(p.id))
+                    .map((p) => p.symbol)
+                    .join(", ")}
+                />
+                <Row
+                  label="Inert for this family"
+                  value={`${SHARED_BASE_PARAMETERS.length - readout.baseUsesParameters.length}`}
+                  note={
+                    SHARED_BASE_PARAMETERS.filter((p) => !readout.baseUsesParameters.includes(p.id))
+                      .map((p) => p.symbol)
+                      .join(", ") || "none"
+                  }
+                />
+              </DiagGroup>
+
+              <DiagGroup title="Raw mass bookkeeping">
+                {readout.componentMass.map((c) => (
+                  <Row
+                    key={c.component}
+                    label={c.component}
+                    value={`${fmt(c.rapierMassKg, 1)} kg`}
+                    note={`target ${fmt(c.targetMassKg, 1)} kg · vol ${fmt(c.volumeM3, 5)} m³ (collider ${fmt(c.colliderVolumeM3, 5)}) · rho ${fmt(c.densityKgPerM3, 0)} kg/m³`}
+                    flag={Math.abs(c.rapierMassKg - c.targetMassKg) > 0.01 * c.targetMassKg}
+                  />
+                ))}
+                <Row
+                  label="Sum vs total"
+                  value={`${fmt(readout.componentMass.reduce((a, c) => a + c.rapierMassKg, 0), 1)} / ${fmt(readout.massKg, 1)} kg`}
+                />
+              </DiagGroup>
+
               <DiagGroup title="Body state">
                 <Row label="Mass (from Rapier)" value={`${fmt(readout.massKg, 0)} kg`} />
                 <Row
@@ -122,6 +203,27 @@ export function DiagnosticsPanel() {
                   value={fmtVec(readout.comLocal, 3)}
                   note={readout.comOverridden ? "EXPLICITLY OVERRIDDEN — abstract probe" : "derived from geometry"}
                   flag={readout.comOverridden}
+                />
+                <Row
+                  label="COM (analytic, m)"
+                  value={fmtVec(readout.comLocalAnalytic, 3)}
+                  note={`independent cross-check · disagreement ${fmt(
+                    1000 *
+                      Math.hypot(
+                        readout.comLocal.x - readout.comLocalAnalytic.x,
+                        readout.comLocal.y - readout.comLocalAnalytic.y,
+                        readout.comLocal.z - readout.comLocalAnalytic.z
+                      ),
+                    3
+                  )} mm`}
+                  flag={
+                    !readout.comOverridden &&
+                    Math.hypot(
+                      readout.comLocal.x - readout.comLocalAnalytic.x,
+                      readout.comLocal.y - readout.comLocalAnalytic.y,
+                      readout.comLocal.z - readout.comLocalAnalytic.z
+                    ) > 1e-3
+                  }
                 />
                 <Row label="Principal inertia (kg·m²)" value={fmtVec(readout.principalInertia, 0)} />
                 <Row label="COM position (m)" value={fmtVec(readout.comWorld, 3)} />
@@ -147,7 +249,6 @@ export function DiagnosticsPanel() {
                 <Row label="Friction μ (both surfaces)" value={fmt(readout.frictionCoefficient, 3)} />
                 <Row label="Restitution" value={fmt(readout.restitution, 3)} />
                 <Row label="Base half-width b" value={`${fmt(readout.baseHalfWidthM, 3)} m`} />
-                <Row label="Contact kind" value={readout.contactKind} />
               </DiagGroup>
 
               {(["left", "right"] as const).map((side) => {

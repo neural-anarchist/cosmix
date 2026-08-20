@@ -1,3 +1,4 @@
+import { basePlanOutline } from "../../statue/bases/planOutline";
 import { useSimStore } from "../../state/store";
 
 const W = 460;
@@ -23,11 +24,13 @@ export function TopViewDiagram() {
     ? [readout.ropes.left.attachmentWorld, readout.ropes.right.attachmentWorld]
     : [ropeParams.left.attachmentLocal, ropeParams.right.attachmentLocal];
 
-  // Fit every point of interest, plus the statue footprint, into the viewbox.
-  const footprintHalfX = (statueParams.baseLengthRatio * statueParams.heightM) / 2;
-  const footprintHalfY = (statueParams.baseWidthRatio * statueParams.heightM) / 2;
-  const xs = [...anchors.map((a) => a.x), ...attachments.map((a) => a.x), footprintHalfX, -footprintHalfX];
-  const ys = [...anchors.map((a) => a.y), ...attachments.map((a) => a.y), footprintHalfY, -footprintHalfY];
+  // The real outline of the base as built, not a rectangle standing in for it.
+  // A plan view whose footprint is always a box would hide the one thing this
+  // phase is varying.
+  const { outline, isContactFootprint } = basePlanOutline(statueParams);
+  const xs = [...anchors.map((a) => a.x), ...attachments.map((a) => a.x), ...outline.map((p) => p.x)];
+  const ys = [...anchors.map((a) => a.y), ...attachments.map((a) => a.y), ...outline.map((p) => p.y)];
+  const footprintMinY = Math.min(...outline.map((p) => p.y));
   const spanX = Math.max(...xs) - Math.min(...xs);
   const spanY = Math.max(...ys) - Math.min(...ys);
   const centerX = (Math.max(...xs) + Math.min(...xs)) / 2;
@@ -60,16 +63,16 @@ export function TopViewDiagram() {
         </text>
         <line x1={px(centerX)} y1={PAD - 10} x2={px(centerX)} y2={H - PAD + 10} className="dg-axis-faint" />
 
-        {/* statue base footprint */}
-        <rect
-          x={px(-footprintHalfX)}
-          y={py(footprintHalfY)}
-          width={footprintHalfX * 2 * scale}
-          height={footprintHalfY * 2 * scale}
+        {/* statue base outline, as actually built */}
+        <polygon
+          points={outline.map((p) => `${px(p.x)},${py(p.y)}`).join(" ")}
           className="dg-footprint"
         />
-        <text x={px(0)} y={py(-footprintHalfY) + 30} className="dg-label dg-label-mid">
-          base footprint
+        {!isContactFootprint && (
+          <line x1={px(Math.min(...outline.map((p) => p.x)))} y1={py(0)} x2={px(Math.max(...outline.map((p) => p.x)))} y2={py(0)} className="dg-contact-line" />
+        )}
+        <text x={px(0)} y={py(footprintMinY) + 30} className="dg-label dg-label-mid">
+          {isContactFootprint ? "contact footprint" : "plan silhouette (rocker)"}
         </text>
 
         {(["left", "right"] as const).map((side) => {
@@ -121,7 +124,10 @@ export function TopViewDiagram() {
         Plan view. Solid lines are the ropes as the solver sees them; the short
         arrows are the horizontal part of each force direction, starting at the
         attachment. A rope with no <em>x</em> extent can produce no forward
-        component at all.
+        component at all.{" "}
+        {isContactFootprint
+          ? "The outline is the base's real ground-contact patch, so its edge is the tipping edge."
+          : "This family is a rocker: the outline is its widest cross-section, not a contact patch — it touches the road along the dashed centre line and has no tipping edge."}
       </figcaption>
     </figure>
   );

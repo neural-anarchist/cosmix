@@ -5,23 +5,28 @@ rigid statue advance by controlled side-to-side rocking? Forward motion is
 never scripted here — it has to emerge from rigid-body dynamics, gravity,
 ground contact, friction, and rope forces, or it doesn't happen at all.
 
-**Status: Phase 2, Step 1 of 6** (Phase 1 complete and validated). App shell, flat
-road, a free rigid-body statue with two base geometries (flat rectangular /
-lateral cylindrical rocker), an explicit rope-anchor model, validated static
+**Status: Phase 2, Steps 1-2 of 6** (Phase 1 complete and validated). App shell,
+flat road, a free rigid-body statue with twelve base geometries on a shared
+parameter schema, an explicit rope-anchor model, validated static
 equilibrium, and a physics diagnostics panel. See [PLAN.md](./PLAN.md) for the
 roadmap and what's landed, and [PHYSICS_MODEL.md](./PHYSICS_MODEL.md) for
 exactly what's simulated versus approximated versus not modeled — including
 two genuine findings Phase 1 turned up: why the cylindrical-rocker base rolls
 away instead of rocking unless actively controlled, and why Rapier's applied
 forces silently compound if you don't reset them
-([full audit](./PHASE1_FORCE_CONTACT_AUDIT.md)).
+([full audit](./PHASE1_FORCE_CONTACT_AUDIT.md)) — and one Step 2 turned up:
+why a convex-hull base could collapse its own contact patch to 39 mm and start
+climbing with nothing pulling it
+([details](./PHASE2_GEOMETRY_AND_CONTROL.md)).
 
 **What this does and does not show.** Phase 1 validates contact, static
 equilibrium, sliding, and lateral rocking. It does *not* demonstrate directed
 forward walking, and a symmetric base on a symmetric flat road is not expected
 to: measured forward progress is 0.15 mm against 0.63 m of lateral motion.
 Directed walking needs fore-aft asymmetric geometry and asymmetric contact
-transfer, which is Phase 2 and beyond.
+transfer. Phase 2 Step 2 has now *built* that geometry, but has not run it as a
+walking candidate — whether any of it changes the response to the validated rope
+forces is a later step's question, and nothing has measured it yet.
 
 ## Setup
 
@@ -45,8 +50,15 @@ npm test            # unit tests (vitest)
 - A perspective 3D viewport (Three.js) with orbit controls, a flat road with
   a centerline and boundary markers, and a procedurally-built Moai — tapered
   torso, arm relief, and a blocky head with brow ridge, nose and elongated
-  ears, all generated from primitives with no external mesh or texture — on
-  either a flat rectangular base (A0) or a lateral cylindrical rocker (A4).
+  ears, all generated from primitives with no external mesh or texture.
+- **Twelve base families**: symmetric A-series (rectangular, rounded, elliptical,
+  stadium, cylindrical rocker, ellipsoidal rocker) and fore-aft asymmetric
+  B-series (D-base, forward teardrop, rear teardrop, offset D-base, asymmetric
+  rocker, Moai D-base with an angled mounting plane). All share one normalized
+  parameter schema; each family declares which parameters it reads, and the rest
+  are visibly disabled rather than silently ignored. B2 and B3 are an exact
+  fore-aft mirrored pair, generated one from the other so a mirrored control
+  trial is a real control.
 - A mass model with real mechanical parameters: torso taper, intrinsic forward
   lean of the upper body (reported separately from dynamic pitch), and an
   optional explicit COM override for abstract sweeps. Mass, COM and inertia are

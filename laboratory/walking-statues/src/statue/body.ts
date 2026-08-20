@@ -16,12 +16,51 @@ export interface StatueColliderInfo {
   approximation: string;
 }
 
+/**
+ * Raw, per-collider mass bookkeeping — the numbers that go *into* Rapier's mass
+ * computation rather than the aggregate that comes out.
+ *
+ * Reported because the aggregate alone cannot tell you whether a base family's
+ * volume was computed correctly: a wrong volume and a compensating wrong density
+ * produce exactly the right total mass and a quietly wrong inertia tensor. With
+ * the target mass, the volume and the density each shown, and Rapier's own
+ * per-collider mass alongside, that failure has nowhere to hide.
+ */
+export interface ComponentMassReport {
+  component: StatueComponent;
+  /** How many colliders make up this component. More than one for a
+   * flat-bottomed base, which is split into wedges for contact stability. */
+  colliderCount: number;
+  /** Mass this component was *asked* to have, from the mass-fraction controls. */
+  targetMassKg: number;
+  /** Volume of the collider primitive, as this code computed it. */
+  volumeM3: number;
+  /** Volume of the collider Rapier actually built. For a convex-hull base this
+   * can sit a fraction of a percent below `volumeM3`, because Rapier's hull
+   * builder merges near-coplanar vertices; the difference is the faceting
+   * deficit and is shown rather than absorbed. */
+  colliderVolumeM3: number;
+  /** Density handed to Rapier: target mass / volume. */
+  densityKgPerM3: number;
+  /** Mass Rapier reports for the collider it actually built. Divergence from
+   * `targetMassKg` means the volume assumed here is not the volume of the
+   * shape Rapier constructed. */
+  rapierMassKg: number;
+}
+
 export interface StatueMassReport {
   massKg: number;
   comLocal: Vec3;
   principalInertia: Vec3;
   /** True when the derived mass properties were replaced by an explicit COM. */
   comOverridden: boolean;
+  /** Per-collider inputs and Rapier's per-collider result. */
+  components: ComponentMassReport[];
+  /** COM computed independently in `geometry.ts` from the same primitives.
+   * Cross-checked against `comLocal` in the unit tests and displayed beside it,
+   * so a density, volume or placement error surfaces as a visible disagreement
+   * rather than as a plausible-looking number. */
+  comLocalAnalytic: Vec3;
 }
 
 export interface StatueBody {
@@ -68,14 +107,28 @@ export function createStatueBody(
   );
 
   const { torso, head, torsoPlacement, headPlacement } = geometry;
-  const torsoDensity = torso.massKg / (torso.widthY * torso.depthX * torso.heightZ);
-  const headDensity = head.massKg / ((4 / 3) * Math.PI * head.radius ** 3);
+  const torsoVolume = torso.widthY * torso.depthX * torso.heightZ;
+  const headVolume = (4 / 3) * Math.PI * head.radius ** 3;
+  const torsoDensity = torso.massKg / torsoVolume;
+  const headDensity = head.massKg / headVolume;
 
-  const entries: { desc: RAPIER.ColliderDesc; component: StatueComponent; approximation: string }[] = [
+  const entries: {
+    desc: RAPIER.ColliderDesc;
+    component: StatueComponent;
+    approximation: string;
+    targetMassKg: number;
+    volumeM3: number;
+  }[] = [
+    // A flat-bottomed family returns several wedge colliders rather than one
+    // solid (see bases/footprints.ts `wedgeDecomposition`). They share a single
+    // uniform density, so the base's target mass and volume belong to the set
+    // rather than to any one piece, and are aggregated below.
     ...baseModule.colliderDescs(params, RAPIER_MODULE).map((desc) => ({
       desc,
       component: "base" as const,
-      approximation: baseModule.colliderApproximation
+      approximation: baseModule.colliderApproximation(params),
+      targetMassKg: geometry.base.massKg,
+      volumeM3: geometry.base.volumeM3
     })),
     {
       // Half-extents are (x/forward, y/lateral, z/vertical) throughout.
@@ -87,7 +140,9 @@ export function createStatueBody(
       approximation:
         params.torsoTaper > 0
           ? "Tapered torso collided as a single cuboid at its mean cross-section."
-          : "Uniform box torso collided exactly as a cuboid."
+          : "Uniform box torso collided exactly as a cuboid.",
+      targetMassKg: torso.massKg,
+      volumeM3: torsoVolume
     },
     {
       desc: RAPIER_MODULE.ColliderDesc.ball(head.radius)
@@ -97,7 +152,9 @@ export function createStatueBody(
       approximation:
         "Blocky Moai head collided as an inscribed sphere of radius H_head/2 — a " +
         "conservative, deliberately simple stand-in retained unchanged from the " +
-        "validated Phase 1 configuration."
+        "validated Phase 1 configuration.",
+      targetMassKg: head.massKg,
+      volumeM3: headVolume
     }
   ];
 
@@ -111,7 +168,33 @@ export function createStatueBody(
   }));
   const colliders = colliderInfo.map((info) => info.collider);
 
+  // Densities were computed from this code's own volumes. For a convex-hull
+  // base, the solid Rapier builds can enclose slightly less than the polytope
+  // handed to it, which would leave the base a fraction of a percent light and
+  // silently shift the whole statue's COM. Rescaling against the colliders' own
+  // total volume puts the base's mass exactly on its target — and it is the
+  // *total* that matters, since the wedges share one uniform density and only
+  // their sum is the base.
+  //
+  // A0 and A4 are deliberately excluded: their colliders are analytic
+  // primitives whose volume is exact by construction, so there is nothing to
+  // correct, and leaving that path untouched keeps the validated Phase 1
+  // configuration bit-identical.
+  if (baseModule.polytope(params) !== null) {
+    const baseColliders = colliders.filter((_, i) => entries[i]!.component === "base");
+    const builtVolume = baseColliders.reduce((sum, collider) => sum + collider.volume(), 0);
+    if (builtVolume > 0) {
+      const density = geometry.base.massKg / builtVolume;
+      for (const collider of baseColliders) collider.setDensity(density);
+    }
+  }
+
   rigidBody.recomputeMassPropertiesFromColliders();
+
+  // Captured before any COM override zeroes the densities, so the report still
+  // shows what the geometry actually weighed.
+  const componentMasses = colliders.map((collider) => collider.mass());
+  const colliderVolumes = colliders.map((collider) => collider.volume());
 
   if (geometry.comOverrideLocal) {
     applyComOverride(rigidBody, colliders, params.totalMassKg, geometry.comOverrideLocal);
@@ -119,6 +202,26 @@ export function createStatueBody(
 
   const comLocal = rigidBody.localCom();
   const principal = rigidBody.principalInertia();
+
+  // Aggregated per component rather than per collider: a base split into six
+  // wedges is still one component with one target mass, and six near-identical
+  // rows would obscure exactly the comparison this report exists to make.
+  const components: ComponentMassReport[] = [];
+  for (const component of ["base", "torso", "head"] as const) {
+    const indices = entries.flatMap((entry, i) => (entry.component === component ? [i] : []));
+    if (indices.length === 0) continue;
+    const first = entries[indices[0]!]!;
+    const colliderVolumeM3 = indices.reduce((sum, i) => sum + colliderVolumes[i]!, 0);
+    components.push({
+      component,
+      colliderCount: indices.length,
+      targetMassKg: first.targetMassKg,
+      volumeM3: first.volumeM3,
+      colliderVolumeM3,
+      densityKgPerM3: colliders[indices[0]!]!.density(),
+      rapierMassKg: indices.reduce((sum, i) => sum + componentMasses[i]!, 0)
+    });
+  }
 
   return {
     rigidBody,
@@ -129,7 +232,9 @@ export function createStatueBody(
       massKg: rigidBody.mass(),
       comLocal: { x: comLocal.x, y: comLocal.y, z: comLocal.z },
       principalInertia: { x: principal.x, y: principal.y, z: principal.z },
-      comOverridden: geometry.comOverrideLocal !== null
+      comOverridden: geometry.comOverrideLocal !== null,
+      components,
+      comLocalAnalytic: geometry.comLocalAnalytic
     }
   };
 }

@@ -93,11 +93,24 @@ src/
     factory.ts          body.ts + display meshes, per-component collider
                         overlay, COM marker
     bases/
-      types.ts          BaseGeometryModule: dims / colliderDescs / visual
-      registry.ts       id -> module map; unimplemented ids throw a clear
-                        "not implemented in this phase" error rather than
-                        silently falling back
-      a0-flatRect.ts, a4-lateralRocker.ts
+      types.ts          BaseGeometryModule: shared-parameter declaration,
+                        dims / polytope / colliderPolytopes / colliderDescs /
+                        visual                                           [headless]
+      shared.ts         the shared normalized parameter schema and its
+                        ranges and validators                            [headless]
+      footprints.ts     2D outline generators + convex hull, asymmetry,
+                        and the wedge decomposition                      [headless]
+      polytope.ts       triangulated convex solids: volume, centroid,
+                        extrusion, rocker lofting, fore-aft mirroring
+      polytopeFamily.ts one construction path shared by the ten
+                        polytope-backed families
+      registry.ts       id -> module map, plus the fore-aft and lateral
+                        mirror transforms
+      planOutline.ts    plan-view outline for the diagnostic diagram
+      a0-flatRect.ts, a4-lateralRocker.ts   exact analytic primitives,
+                        preserved unchanged from validated Phase 1
+      flatFamilies.ts   A1 A2 A3 B0 B2 B3 B4 B6
+      rockerFamilies.ts A5 B5
   control/
     ropeModel.ts        two-point rope geometry -> direction, force, torque [headless]
     ropeDefaults.ts     default haul geometry; purely-lateral arrangement   [headless]
@@ -195,24 +208,61 @@ createStatue(params, ctx, friction, restitution) => {
 
 Mass properties are never set directly: each collider gets a density computed
 from its target sub-mass and its analytic volume, and Rapier derives the
-aggregate mass, COM and inertia. `statue/geometry.test.ts` cross-checks the
-analytic COM against Rapier's own `worldCom()` for both base families, so a
-density or volume error cannot pass silently.
+aggregate mass, COM and inertia. `statue/bases/baseFamilies.test.ts` cross-checks the
+analytic COM against Rapier's own for *every* family, so a density, volume,
+centroid or placement error cannot pass silently.
 
-Base families implement `BaseGeometryModule`, split across three methods plus a
-required `colliderApproximation` string, so the physics never needs the renderer
-and every family must state how its collider approximates its visual:
+Base families implement `BaseGeometryModule`, split so the physics never needs
+the renderer and every family must state, in prose, how its collider
+approximates its visual:
 
-- `dims(params): BaseDims` — pure scalars, including `contactHalfWidthY` (the
-  tipping lever arm `b`) and `contactKind` (`"flat" | "rocker"`). The
-  threshold math consumes this rather than branching on family id.
-- `colliderDescs(params, RAPIER): ColliderDesc[]` — collision geometry only.
+- `usesParameters` — which of the eleven shared normalized parameters this
+  family reads. The UI greys out the rest with the reason shown; a control that
+  appears to do something but does not is worse than no control.
+- `validate(params)` — range-checks only the parameters this family reads, so a
+  single parameter set can be carried across families without false failures.
+- `dims(params): BaseDims` — pure scalars: extents, volume, footprint area, the
+  family's own centroid, the tipping lever arms `b` on each side, and
+  `contactKind` (`"flat" | "rocker"`). The threshold math consumes this rather
+  than branching on family id.
+- `polytope(params)` — the single triangulated solid, or null for A0/A4.
+- `colliderPolytopes(params)` — the solids the solver actually receives, which
+  for a flat-bottomed family is that solid split into wedges. The overlay draws
+  these, so what the overlay shows is what the solver has.
+- `colliderDescs(params, RAPIER)` — collision geometry only.
 - `visual(params): THREE.Object3D` — display geometry only.
 
-All three derive from `dims`, so collision and display geometry cannot drift
-apart. Adding a base family is: implement the interface in `bases/<id>.ts`,
-register it in `bases/registry.ts`. Nothing else in the codebase branches on
-base family id.
+Ten of the twelve families are built through one shared path
+(`definePolytopeFamily`), which derives the collider, the display mesh and the
+density from the *same* polytope. There is no per-family opportunity for the
+simulated shape, the drawn shape and the assumed volume to disagree — the failure
+mode a dozen hand-written families would otherwise invite. A0 and A4 stay off
+that path deliberately: their colliders are the exact analytic primitives the
+Phase 1 benchmarks were validated against, and re-expressing them as hulls would
+change the simulated shape by whatever the two constructions disagree about.
+
+Adding a base family is: write a `PolytopeFamilySpec` (a shape function and a
+declaration of which parameters it reads) and register it. Nothing else in the
+codebase branches on base family id.
+
+### Contact discretisation
+
+Flat-bottomed bases are handed to the solver as eight wedge colliders rather than
+one solid. This is not a modelling choice about the statue — it is a fix for a
+measured solver artifact. Rapier keeps at most four solver contacts per collider
+pair, and for a large flat hull its point selection could collapse the contact
+patch from 0.43 m to 39 mm, at which point the statue balanced on a stamp and
+climbed 10-35 mm with nothing pulling it. Splitting the same solid into wedges
+gives one manifold per wedge, keeping contacts spread over the real footprint.
+The union is exactly the original solid — same outline, volume, mass and COM, all
+asserted by test — and the wedge count was fixed by a convergence study rather
+than tuned. See PHASE2_GEOMETRY_AND_CONTROL.md.
+
+A0's cuboid never showed the artifact, because box-versus-box has its own
+specialised contact path in Rapier. That is worth stating plainly: a whole phase
+of validation against A0 could not have caught it, and the regression that now
+guards it is written on the observable — a statue with no forces applied must not
+move — rather than on any internal detail.
 
 ## Rope model
 
@@ -234,12 +284,10 @@ thing a user could check against.
 
 Named here so it's unambiguous rather than discovered by absence:
 
-- Only A0 and A4 base families (rest are Phase 2+, per the spec's own
-  phase ordering).
-- Torso/head are simple primitives, not the tapered/lathe-generated Moai
-  silhouette (Phase 2).
 - No pulling *protocols* (P0–P5) — only direct manual hold-to-pull forces.
-  P1/P3 land in Phase 2.
+  P1/P3 land in Phase 2 Steps 5 and 6.
+- No matched-comparison mode, so switching base family does not yet hold mass,
+  COM and footprint fixed (Phase 2 Step 3).
 - No road types beyond flat.
 - No charts, no time-series recording, no energy/work accounting, no presets,
   no export, no sweeps, no calibration.

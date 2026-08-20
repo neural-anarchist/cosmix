@@ -5,12 +5,25 @@ import type { StatueColliderInfo, StatueMassReport } from "./body";
 import type { StatueGeometry } from "./geometry";
 
 /**
- * Full family enum declared now so UI/state code doesn't reshape when more
- * families land; only "A0" and "A4" have an implementation behind them in
- * Phase 1 (see statue/bases/registry.ts). Selecting anything else throws
- * rather than silently substituting a different shape.
+ * Every base family, all of them implemented (see statue/bases/registry.ts).
+ *
+ * The A-series is symmetric fore-aft and exists as validation and reference
+ * geometry; the B-series is deliberately asymmetric and is what Phase 2 tests.
+ * B3 is B2's exact reflection and exists solely as its mirror control.
  */
-export type BaseFamilyId = "A0" | "A4" | "A5" | "B0" | "B2" | "B6";
+export type BaseFamilyId =
+  | "A0"
+  | "A1"
+  | "A2"
+  | "A3"
+  | "A4"
+  | "A5"
+  | "B0"
+  | "B2"
+  | "B3"
+  | "B4"
+  | "B5"
+  | "B6";
 
 export interface StatueParams {
   /** Total statue height H, meters, base to crown. */
@@ -24,11 +37,48 @@ export interface StatueParams {
   baseWidthRatio: number;
   /** L_base / H. Full extent along x for both A0 and A4. */
   baseLengthRatio: number;
-  /** H_base / H. Used by A0 directly. Not used by A4 — a cylindrical
-   * rocker's height is fixed by its radius (baseWidthRatio), and the
-   * control is disabled in the UI for that family rather than silently
-   * ignored. */
+  /** H_base / H. Used by the flat-bottomed families directly. Not used by the
+   * rockers, whose height is fixed by their curvature; the UI disables it for
+   * those families rather than letting it appear to do something. */
   baseHeightRatio: number;
+
+  /**
+   * R_lat / H — lateral curvature radius. A real control only for A5, where it
+   * sets how sharply the base curves side to side and therefore (with the
+   * width) how tall it is. For A4 and B5 the lateral radius is *defined* as
+   * W_base/2, so those families declare that they do not read this.
+   */
+  baseLateralRadiusRatio: number;
+  /**
+   * R_fore / H — fore-aft curvature radius. Read by B2/B3 as the teardrop's
+   * tail radius and by B5 as the fore-aft rolling radius at contact.
+   */
+  baseForeAftRadiusRatio: number;
+  /** r_edge / H — plan-corner rounding radius. Read by A1. */
+  baseEdgeRoundingRatio: number;
+  /**
+   * Front/back asymmetry, dimensionless in [-0.8, 0.8]. Splits the total
+   * fore-aft length: the forward portion becomes (L/2)(1 + f) and the rear
+   * (L/2)(1 - f), so total length is preserved exactly and the control changes
+   * shape rather than size.
+   */
+  baseFrontBackAsymmetry: number;
+  /**
+   * Left/right asymmetry, dimensionless in [-0.5, 0.5]. Same construction
+   * laterally: the +y half-width becomes (W/2)(1 + a) and the -y half-width
+   * (W/2)(1 - a), preserving maximum lateral width exactly.
+   */
+  baseLeftRightAsymmetry: number;
+  /** x_base / H — fore-aft offset of the base beneath the upper body. Read by B4. */
+  baseOffsetXRatio: number;
+  /**
+   * Intrinsic forward lean built into the *base*, degrees: the angle its top
+   * face is cut at. Read by B6. Distinct from `forwardLeanDeg`, which leans the
+   * upper body on an untilted base; this one leaves ground contact completely
+   * alone and is the mechanism usually invoked for the real statues. The two
+   * add, and both are reported separately from dynamic pitch.
+   */
+  baseForwardLeanDeg: number;
 
   /** Fraction of M carried by the base. */
   baseMassFraction: number;

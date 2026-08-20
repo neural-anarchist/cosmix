@@ -20,6 +20,18 @@ export const PHASE1_BASELINE_STATUE_PARAMS: StatueParams = {
   baseLengthRatio: 0.22,
   baseHeightRatio: 0.16,
 
+  // Every shape control added in Step 2 defaults to a value A0 does not read,
+  // or to zero. The Phase 1 baseline is therefore bit-identical under the
+  // extended schema: A0 declares that it reads only width, length, height and
+  // mass fraction, so nothing below can reach its collider.
+  baseLateralRadiusRatio: 0.16,
+  baseForeAftRadiusRatio: 0.08,
+  baseEdgeRoundingRatio: 0.03,
+  baseFrontBackAsymmetry: 0,
+  baseLeftRightAsymmetry: 0,
+  baseOffsetXRatio: 0,
+  baseForwardLeanDeg: 0,
+
   baseMassFraction: 0.35,
   headMassFraction: 0.25,
 

@@ -83,8 +83,17 @@ export interface StatueGeometry {
   base: BaseDims;
   torso: TorsoGeometry;
   head: HeadGeometry;
-  /** Intrinsic lean, radians about +y. Distinct from dynamic pitch. */
+  /**
+   * Total intrinsic lean applied to the upper body, radians about +y: the
+   * statue's own `forwardLeanDeg` plus whatever tilt the base's mounting plane
+   * imparts. Distinct from dynamic pitch, which is simulated rather than built.
+   */
   forwardLeanRad: number;
+  /** The `forwardLeanDeg` half of the intrinsic lean, radians. */
+  bodyLeanRad: number;
+  /** The base-mounting-plane half of the intrinsic lean, radians. Non-zero
+   * only for a family whose top face is cut at an angle (B6). */
+  baseMountLeanRad: number;
   /** Point the upper body leans about: the top-centre of the base. */
   leanPivot: Vec3;
   /** Post-lean placement of the torso collider/mesh, body-local. */
@@ -195,7 +204,14 @@ export function computeStatueGeometry(params: StatueParams): StatueGeometry {
   // ---- Intrinsic lean, applied to the upper body only. The base keeps its
   // ground contact geometry: leaning the whole body would be indistinguishable
   // from dynamic pitch and would change which part of the base touches down.
-  const forwardLeanRad = (params.forwardLeanDeg * Math.PI) / 180;
+  // Two independent sources of intrinsic lean, added: the statue's own lean
+  // parameter, and the tilt of the base's mounting plane for a family whose top
+  // face is cut at an angle. They are reported separately as well as summed,
+  // because they are different modelling claims — one leans the figure on a
+  // level plinth, the other cuts the plinth.
+  const bodyLeanRad = (params.forwardLeanDeg * Math.PI) / 180;
+  const baseMountLeanRad = base.mountLeanRad;
+  const forwardLeanRad = bodyLeanRad + baseMountLeanRad;
   const leanPivot: Vec3 = { x: 0, y: 0, z: base.topZ };
   const leanRotation = leanQuaternion(forwardLeanRad);
 
@@ -208,15 +224,24 @@ export function computeStatueGeometry(params: StatueParams): StatueGeometry {
     rotation: leanRotation
   };
 
-  // ---- Analytic COM of the collider configuration. A uniform flat prism sits
-  // at half its height; a uniform cylinder lying on its side sits at its
-  // radius, which is also topZ/2. Both give base.topZ / 2.
-  const baseComZ = base.topZ / 2;
+  // ---- Analytic COM of the collider configuration, cross-checked against
+  // Rapier's own in the unit tests. The base contributes its family's reported
+  // centroid rather than an assumed half-height: that assumption is exact for
+  // A0's prism and A4's lying cylinder, and wrong for every curved or
+  // wedge-topped family added since.
   const comLocalAnalytic: Vec3 = {
-    x: (torso.massKg * torsoPlacement.position.x + head.massKg * headPlacement.position.x) / M,
-    y: (torso.massKg * torsoPlacement.position.y + head.massKg * headPlacement.position.y) / M,
+    x:
+      (base.massKg * base.comLocal.x +
+        torso.massKg * torsoPlacement.position.x +
+        head.massKg * headPlacement.position.x) /
+      M,
+    y:
+      (base.massKg * base.comLocal.y +
+        torso.massKg * torsoPlacement.position.y +
+        head.massKg * headPlacement.position.y) /
+      M,
     z:
-      (base.massKg * baseComZ +
+      (base.massKg * base.comLocal.z +
         torso.massKg * torsoPlacement.position.z +
         head.massKg * headPlacement.position.z) /
       M
@@ -245,6 +270,8 @@ export function computeStatueGeometry(params: StatueParams): StatueGeometry {
     torso,
     head,
     forwardLeanRad,
+    bodyLeanRad,
+    baseMountLeanRad,
     leanPivot,
     torsoPlacement,
     headPlacement,

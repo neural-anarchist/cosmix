@@ -1,7 +1,7 @@
 # PARAMETER_REFERENCE — Walking Statues
 
 Documents the parameters that actually exist in the running app — currently
-Phase 1 plus Phase 2 Step 1. It grows with each phase rather than being written
+Phase 1 plus Phase 2 Steps 1 and 2. It grows with each phase rather than being written
 once against the full spec up front, so anything absent here is genuinely
 absent from the code. Defaults live in `src/statue/defaults.ts` and
 `src/state/store.ts`.
@@ -44,12 +44,59 @@ PHASE2_GEOMETRY_AND_CONTROL.md.
 
 ## Base geometry
 
-| Control | Units | Range | Default | Notes |
-|---|---|---|---|---|
-| Base family | — | A0, A4 (A5/B0/B2/B6 shown disabled) | A0 | See ARCHITECTURE.md for the registry pattern. |
-| Base width / H ($W_{base}/H$) | — | 0.12–0.6 | 0.32 | For A4 this is the rocker's full diameter. |
-| Base length / H ($L_{base}/H$) | — | 0.1–0.5 | 0.22 | Extent along x for both families. |
-| Base height / H ($H_{base}/H$) | — | 0.06–0.35 | 0.16 | A0 only — disabled for A4, whose height is fixed by its radius. |
+All twelve families are described against one shared normalized schema. A family
+that does not read a parameter has that control **disabled with the reason
+shown**, rather than the control silently doing nothing; which parameters a
+family reads is declared by the family itself and listed in the diagnostics
+panel. Ranges come from `src/statue/bases/shared.ts`, so a slider and its
+validator cannot disagree.
+
+| Family | Contact | Reads | Notes |
+|---|---|---|---|
+| A0 — Flat rectangular prism | flat | W, L, H_b | The validated Phase 1 reference. Exact analytic cuboid. |
+| A1 — Rounded rectangular prism | flat | W, L, H_b, r_edge, f_lr | Plan corners rounded; bottom edge stays sharp. |
+| A2 — Elliptical prism | flat | W, L, H_b, f_lr | |
+| A3 — Capsule / stadium prism | flat | W, L, H_b, f_lr | Caps flatten to semi-ellipses when $L < W$, so both stated dimensions stay exact. Coincides with A2 in that case. |
+| A4 — Lateral cylindrical rocker | rocker | W, L | Exact analytic cylinder; the smooth control for the faceted rockers. $R_{lat}$ is defined as $W/2$. |
+| A5 — Ellipsoidal rocker | rocker | W, L, R_lat | Height is derived: for an ellipsoid $R_{lat} = b^2/c$, so width, curvature and height are not independent. |
+| B0 — D-base | flat | W, L, H_b, f_fb, f_lr | Rounded nose, flat transom. First fore-aft asymmetric family. |
+| B2 — Forward teardrop | flat | W, L, H_b, R_fore, f_fb, f_lr | $R_{fore}$ is the tail radius. |
+| B3 — Rear teardrop | flat | W, L, H_b, R_fore, f_fb, f_lr | B2's exact reflection, generated from it. The fore-aft mirror control. |
+| B4 — Offset D-base | flat | W, L, H_b, f_fb, f_lr, x_base | B0's solid, translated along x. |
+| B5 — Fore-aft asymmetric rocker | rocker | W, L, R_fore, f_fb | Rolls laterally like A4; fore-aft profile rises asymmetrically. Mirrors onto itself via $-f_{fb}$. |
+| B6 — Moai D-base + angled mount | flat | W, L, H_b, f_fb, f_lr, theta_base | Top face cut at an angle, leaning the upper body without tilting the footprint. |
+
+| Control | Symbol | Units | Range | Default | Notes |
+|---|---|---|---|---|---|
+| Base width | $W_{base}/H$ | — | 0.12–0.6 | 0.32 | **Always the maximum lateral width**, for every family and every asymmetry. |
+| Base length | $L_{base}/H$ | — | 0.1–0.5 | 0.22 | **Always the total fore-aft length.** |
+| Base height | $H_{base}/H$ | — | 0.06–0.35 | 0.16 | Not read by the rockers, whose height is fixed by their curvature. |
+| Lateral curvature | $R_{lat}/H$ | — | 0.06–0.6 | 0.16 | A5 only. For A4 and B5 the lateral radius *is* $W/2$. |
+| Fore-aft curvature | $R_{fore}/H$ | — | 0.02–0.6 | 0.08 | Teardrop tail radius (B2/B3), or fore-aft rolling radius at contact (B5). |
+| Edge rounding | $r_{edge}/H$ | — | 0–0.12 | 0.03 | A1 only; plan corners. |
+| Front/back asymmetry | $f_{fb}$ | — | −0.8–0.8 | 0 | Splits the length as $(L/2)(1 \pm f)$. **Total length is preserved exactly** — it changes shape, not size. |
+| Left/right asymmetry | $f_{lr}$ | — | −0.5–0.5 | 0 | Splits the width as $(W/2)(1 \pm a)$. **Maximum width is preserved exactly.** |
+| Base x-offset | $x_{base}/H$ | — | −0.15–0.15 | 0 | B4 only. Shifts the base fore or aft beneath the upper body. |
+| Base mount lean | $\theta_{base}$ | deg | −15–30 | 0 | B6 only. The angle the base's top face is cut at. Leans the upper body while leaving ground contact untouched; **adds to** the statue's own forward lean, and both are reported separately from dynamic pitch. |
+
+Out-of-range values sitting in a control a family does not read are **ignored,
+not rejected** — carrying one parameter set across families is the point of a
+shared schema.
+
+### Collision model
+
+A0 and A4 keep exact analytic primitives. The other ten are triangulated convex
+polytopes, and their display mesh is generated from the same triangles, so the
+only approximation is a stated facet count: 32 segments per curved outline, 48
+across a rocker arc, 13 stations along it. These counts are fixed constants and
+are deliberately **not** tied to the Visual detail control — they are the
+collider, not decoration.
+
+Flat-bottomed bases are handed to the solver as 8 wedge colliders whose union is
+the identical solid. This is a contact-discretisation fix for a measured defect
+(Rapier caps solver contacts at four per pair, and a single large flat hull could
+collapse its contact patch to 39 mm and start climbing); it changes no geometry,
+mass or COM. See PHASE2_GEOMETRY_AND_CONTROL.md for the convergence study.
 
 ## Road & contact
 

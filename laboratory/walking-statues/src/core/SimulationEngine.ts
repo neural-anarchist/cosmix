@@ -7,7 +7,11 @@ import { quaternionToRollPitchYaw, radToDeg } from "./orientation";
 import { add, length as vecLength, type Quat, type Vec3 } from "./vec3";
 import { buildFlatRoad } from "../road/flatRoad";
 import type { RoadBuild, RoadParams } from "../road/types";
-import { getBaseModule } from "../statue/bases/registry";
+import {
+  foreAftMirrorFamily,
+  getBaseModule,
+  SYMMETRIC_BASE_FAMILY_IDS
+} from "../statue/bases/registry";
 import { createStatue } from "../statue/factory";
 import type { StatueBuild, StatueParams } from "../statue/types";
 import { applyRopeForces } from "../control/ropeForces";
@@ -66,8 +70,47 @@ export interface EngineSnapshot {
   comOverridden: boolean;
   /** Compound components and how each one's collider approximates its visual. */
   components: { component: string; approximation: string }[];
+  /** Raw per-collider mass bookkeeping: what each component was asked to weigh,
+   * the volume assumed for it, the density that implies, and the mass Rapier
+   * ended up with. A wrong volume and a compensating density give the right
+   * total and a quietly wrong inertia tensor, so the inputs are shown too. */
+  componentMass: {
+    component: string;
+    targetMassKg: number;
+    volumeM3: number;
+    colliderVolumeM3: number;
+    densityKgPerM3: number;
+    rapierMassKg: number;
+  }[];
+  /** COM computed independently from the geometry, for comparison with the one
+   * Rapier derived from collider densities. */
+  comLocalAnalytic: Vec3;
   baseFamily: string;
   baseLabel: string;
+  baseSummary: string;
+  /** Which of the shared normalized base parameters this family actually reads;
+   * the rest are inert for it and shown as such. */
+  baseUsesParameters: string[];
+  /** Whether an exact fore-aft mirror control exists for this family, and which. */
+  baseMirrorFamily: string | null;
+  /** Fore-aft symmetric families have no mechanism to prefer a direction on a
+   * flat symmetric road, so they are validation models rather than candidates. */
+  baseIsSymmetric: boolean;
+  /** Scalar geometry of the base as built. */
+  baseGeometry: {
+    lengthXM: number;
+    widthYM: number;
+    topZM: number;
+    volumeM3: number;
+    footprintAreaM2: number | null;
+    contactHalfWidthYLeftM: number;
+    contactHalfWidthYRightM: number;
+    offsetXM: number;
+    comLocal: Vec3;
+  };
+  /** Intrinsic lean split into its two independent sources. */
+  bodyLeanDeg: number;
+  baseMountLeanDeg: number;
 
   linvel: Vec3;
   angvel: Vec3;
@@ -645,6 +688,7 @@ export class SimulationEngine {
     if (this.everStarted) status = regime === "TOPPLING" || regime === "AIRBORNE" ? "red" : "yellow";
 
     const principal = body.principalInertia();
+    const baseModule = getBaseModule(this.statueParams.baseFamily);
 
     this.listeners.forEach((fn) =>
       fn({
@@ -665,12 +709,43 @@ export class SimulationEngine {
         comLocal: statue.mass.comLocal,
         principalInertia: { x: principal.x, y: principal.y, z: principal.z },
         comOverridden: statue.mass.comOverridden,
-        components: statue.colliderInfo.map((info) => ({
-          component: info.component,
-          approximation: info.approximation
+        // De-duplicated by component: a flat-bottomed base is several wedge
+        // colliders but one component, and repeating its row six times would
+        // bury the torso and head rather than inform anyone.
+        components: [...new Map(
+          statue.colliderInfo.map((info) => [
+            info.component,
+            { component: info.component, approximation: info.approximation }
+          ])
+        ).values()],
+        componentMass: statue.mass.components.map((c) => ({
+          component: c.component,
+          targetMassKg: c.targetMassKg,
+          volumeM3: c.volumeM3,
+          colliderVolumeM3: c.colliderVolumeM3,
+          densityKgPerM3: c.densityKgPerM3,
+          rapierMassKg: c.rapierMassKg
         })),
+        comLocalAnalytic: geometry.comLocalAnalytic,
         baseFamily: this.statueParams.baseFamily,
-        baseLabel: getBaseModule(this.statueParams.baseFamily).label,
+        baseLabel: baseModule.label,
+        baseSummary: baseModule.summary,
+        baseUsesParameters: [...baseModule.usesParameters],
+        baseMirrorFamily: foreAftMirrorFamily(this.statueParams.baseFamily),
+        baseIsSymmetric: SYMMETRIC_BASE_FAMILY_IDS.includes(this.statueParams.baseFamily),
+        baseGeometry: {
+          lengthXM: geometry.base.lengthX,
+          widthYM: geometry.base.widthY,
+          topZM: geometry.base.topZ,
+          volumeM3: geometry.base.volumeM3,
+          footprintAreaM2: geometry.base.footprintAreaM2,
+          contactHalfWidthYLeftM: geometry.base.contactHalfWidthYLeft,
+          contactHalfWidthYRightM: geometry.base.contactHalfWidthYRight,
+          offsetXM: geometry.base.offsetX,
+          comLocal: geometry.base.comLocal
+        },
+        bodyLeanDeg: radToDeg(geometry.bodyLeanRad),
+        baseMountLeanDeg: radToDeg(geometry.baseMountLeanRad),
         linvel,
         angvel,
         speedMps,

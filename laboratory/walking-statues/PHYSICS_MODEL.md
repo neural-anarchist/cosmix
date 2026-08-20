@@ -44,9 +44,13 @@ physics. This file is updated as each lands, not rewritten at the end.
   thresholds produces no motion, to quantified tolerances (§ "Static
   thresholds" below). This is a property of the contact solver, not of
   damping: it holds with linear and angular damping set to zero.
-- **Two base geometry families**, A0 (flat rectangular prism) and A4
-  (lateral cylindrical rocker), each with its own analytically-derived
-  collider and matching visual mesh.
+- **Twelve base geometry families** (Phase 2 Step 2), described against one
+  shared normalized parameter schema: symmetric A0-A5 and fore-aft asymmetric
+  B0/B2/B3/B4/B5/B6. A0 and A4 keep the exact analytic cuboid and cylinder they
+  were validated with; the other ten are triangulated convex polytopes whose
+  display mesh is generated from the *same* triangles as the collider. Each
+  family declares which shared parameters it reads, and each states its own
+  collider approximation.
 - **Mass distribution as a first-class parameter set** (Phase 2 Step 1). Torso
   taper and intrinsic forward lean move real material, so they change the
   collider cross-section, the COM and the inertia tensor. Lean rotates the
@@ -72,6 +76,22 @@ physics. This file is updated as each lands, not rewritten at the end.
 - **Full-cylinder A4 rocker.** A4 is a complete 360° cylinder rather than a
   partial rocking-chair arc, so nothing in the base geometry itself imposes
   a hard roll limit (see the finding below).
+- **Faceted curved bases.** The ten polytope-backed families approximate their
+  smooth ideal surface with a stated facet count — 32 segments per curved plan
+  outline, 48 across a rocker arc, 13 stations along it. A5 and B5 therefore roll
+  on facets rather than on a curve; A4 is retained as the exact analytic control
+  for exactly that reason. These counts are fixed constants and are deliberately
+  *not* tied to the visual-detail control, because the triangles are the collider.
+- **Rapier's convex-hull builder merges near-coplanar vertices**, so the solid it
+  constructs can enclose slightly less than the polytope handed to it — measured
+  at 1.25% for A5, concentrated at its pointed fore-aft tips. Density is rescaled
+  against the collider's own volume so mass lands exactly on target, and both
+  volumes are shown side by side in the diagnostics rather than the deficit being
+  absorbed.
+- **Flat-bottomed bases are collided as eight wedges, not one solid.** This is a
+  contact-discretisation fix, not a shape change: their union is exactly the
+  original solid, with the same outline, volume, mass and COM, all asserted by
+  test. See the finding below.
 - **Euler-angle roll/pitch/yaw.** Extracted from the orientation quaternion
   via an 'XYZ' Three.js Euler decomposition. This degenerates near gimbal
   lock and roll/pitch stop being cleanly independent at large combined
@@ -118,9 +138,10 @@ physics. This file is updated as each lands, not rewritten at the end.
 - Work/energy accounting, contact-force event logging, slip ratio, lateral
   drift, cost-of-transport, or any of the documented failure-state
   criteria beyond a placeholder 60° "fallen" angle check.
-- Base families A1, A2, A3, A5, B0, B1, B2, B3, B4, B5, B6, C0–C5. The fore-aft
-  asymmetric families that directed walking would actually require are Phase 2
-  Step 2 — so no result obtained so far has had the geometry available to walk.
+- Base families B1 and C0–C5. The fore-aft asymmetric families that directed
+  walking would actually require now exist (Phase 2 Step 2), but **none has been
+  run as a walking candidate** — building the geometry is not measuring it, and
+  no result obtained so far has done so.
 - Everything under Calibration mode, batch sweeps, matched-comparison mode,
   and export.
 
@@ -199,6 +220,42 @@ clamp, and not a position lock: with the reset in place the statue holds
 static equilibrium at 95% of its tipping threshold **with damping set to
 zero**. Full audit, including everything that was ruled out, in
 [PHASE1_FORCE_CONTACT_AUDIT.md](./PHASE1_FORCE_CONTACT_AUDIT.md).
+
+## A genuine finding from Phase 2: a flat hull can collapse its own contact patch
+
+Rapier keeps at most **four solver contacts per collider pair**. For a convex
+polyhedron resting face-down on the road, its contact-point selection is not
+guaranteed to keep those four spread across the face. Measured on the D-base:
+the contact patch started at 0.43 m wide and shrank to **39 mm** over three
+seconds, at which point the statue was balancing on a stamp — and it then began
+*injecting* energy, climbing 10–35 mm with no rope attached and no forcing at
+all. Under a steady sub-threshold pull the same families wandered 17 mm
+backwards, then 30 mm forwards, and rose 12 mm: direction-reversing motion that
+is not physics.
+
+Two details make this worth recording rather than just fixing:
+
+- **A0 never showed it.** Box-versus-box has its own specialised, robust contact
+  path in Rapier. A full phase of validation against A0 could not have caught
+  this, which is a concrete argument for re-validating contact whenever the
+  collision *representation* changes, not only when the physics does.
+- **B2 and B3 — exact geometric mirrors — behaved 30× differently.** That
+  asymmetry was the tell that the cause was numerical rather than physical, since
+  a fore-aft reflection cannot affect a purely lateral pull.
+
+The fix is structural, not tuned: sub-nanometre degenerate footprint edges are
+collapsed, and flat-bottomed bases are handed to the solver as eight wedge
+colliders whose union is exactly the original solid. No damping was added, no
+motion clamped, no geometry changed. The wedge count came from a convergence
+study, not from tuning until it passed: against a 0.5 mm rest tolerance, D-base
+drift measured 4.1 mm at four wedges, 2.8 mm at six, 0.00 mm at eight, 0.09 mm at
+twelve and 0.02 mm at sixteen — so eight is the first value in the converged
+region.
+
+The regression guarding it is written on the observable — *a statue standing on
+a level road with nothing pulling it must not move* — rather than on any internal
+detail of the decomposition, and it runs for every family at both three and ten
+seconds.
 
 ## A genuine finding from Phase 1: A4 is passively unstable at realistic scale
 

@@ -1,12 +1,36 @@
 import * as THREE from "three";
 import { STATUE_BASE_MATERIAL } from "../materials";
+import { validateSharedBaseParams } from "./shared";
 import type { BaseDims, BaseGeometryModule } from "./types";
 
-/** A0: flat rectangular prism base. */
+/**
+ * A0: flat rectangular prism base — the validated Phase 1 reference.
+ *
+ * Deliberately NOT rebuilt on the shared polytope path the other flat families
+ * use. Its collider is the exact analytic cuboid the static-equilibrium,
+ * force-ramp, sliding and rocking benchmarks were validated against, and
+ * re-expressing it as a hull of mesh vertices would change the simulated shape
+ * by whatever the two constructions disagree about, however small. A0's job is
+ * to be the fixed point everything else is measured from.
+ */
 export const a0FlatRect: BaseGeometryModule = {
   id: "A0",
   label: "A0 — Flat rectangular prism",
-  colliderApproximation: "Exact: a single cuboid, identical to the visual mesh.",
+  summary: "The validated Phase 1 baseline: a plain box, symmetric in both directions.",
+  usesParameters: [
+    "baseWidthRatio",
+    "baseLengthRatio",
+    "baseHeightRatio",
+    "baseMassFraction"
+  ],
+  colliderApproximation: () => "Exact: a single analytic cuboid, identical to the visual mesh.",
+
+  validate(params) {
+    validateSharedBaseParams(params, this.usesParameters);
+  },
+
+  polytope: () => null,
+  colliderPolytopes: () => null,
 
   dims(params): BaseDims {
     const { heightM: H, totalMassKg: M } = params;
@@ -21,7 +45,15 @@ export const a0FlatRect: BaseGeometryModule = {
       // A flat bottom face tips about its own edge, so the restoring lever
       // arm is the full lateral half-extent.
       contactHalfWidthY: widthY / 2,
-      contactKind: "flat"
+      contactHalfWidthYLeft: widthY / 2,
+      contactHalfWidthYRight: widthY / 2,
+      contactKind: "flat",
+      volumeM3: lengthX * widthY * heightZ,
+      footprintAreaM2: lengthX * widthY,
+      mountLeanRad: 0,
+      offsetX: 0,
+      // A uniform rectangular prism's centroid is at half its height.
+      comLocal: { x: 0, y: 0, z: heightZ / 2 }
     };
   },
 

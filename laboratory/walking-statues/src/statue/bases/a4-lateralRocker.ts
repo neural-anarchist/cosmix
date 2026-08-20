@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { STATUE_BASE_MATERIAL } from "../materials";
 import { cylinderAxisAlongXQuaternion } from "./geometryUtils";
+import { validateSharedBaseParams } from "./shared";
 import type { BaseDims, BaseGeometryModule } from "./types";
 
 const RADIAL_SEGMENTS = 28;
@@ -23,9 +24,25 @@ const RADIAL_SEGMENTS = 28;
 export const a4LateralRocker: BaseGeometryModule = {
   id: "A4",
   label: "A4 — Lateral cylindrical rocker",
-  colliderApproximation:
+  summary: "The validated Phase 1 rocker, and the smooth control for the faceted rocker families.",
+  usesParameters: [
+    // R_lat is not a control here: for a cylinder it is *defined* as W_base/2,
+    // and offering a separate radius that silently disagreed with the stated
+    // width would be a control that lies.
+    "baseWidthRatio",
+    "baseLengthRatio",
+    "baseMassFraction"
+  ],
+  colliderApproximation: () =>
     "Exact analytic cylinder (axis along x), not a faceted mesh — so rolling " +
     "contact is smooth rather than stepping between facets.",
+
+  validate(params) {
+    validateSharedBaseParams(params, this.usesParameters);
+  },
+
+  polytope: () => null,
+  colliderPolytopes: () => null,
 
   dims(params): BaseDims {
     const { heightM: H, totalMassKg: M } = params;
@@ -39,7 +56,16 @@ export const a4LateralRocker: BaseGeometryModule = {
       // threshold exists for this family. Stability is a rolling-equilibrium
       // question instead (PHYSICS_MODEL.md).
       contactHalfWidthY: 0,
-      contactKind: "rocker"
+      contactHalfWidthYLeft: 0,
+      contactHalfWidthYRight: 0,
+      contactKind: "rocker",
+      volumeM3: Math.PI * radius * radius * params.baseLengthRatio * H,
+      footprintAreaM2: null,
+      mountLeanRad: 0,
+      offsetX: 0,
+      // A cylinder lying on its side has its centroid on the axis, one radius
+      // up — which for this family is also half of topZ.
+      comLocal: { x: 0, y: 0, z: radius }
     };
   },
 

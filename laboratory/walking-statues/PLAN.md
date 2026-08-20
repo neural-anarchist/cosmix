@@ -104,12 +104,13 @@ existing simulations; the internals do not.
 Committed as the preserved baseline (`feat(walking-statues): validate static
 contact, tipping, and rope geometry`).
 
-**Phase 2: Step 1 of 6 complete.** Procedural upper body and mass model, with
-taper, intrinsic forward lean and an explicit COM override. See "Phase 2 —
-Step 1 completion notes" at the bottom of this file, and
+**Phase 2: Steps 1-2 of 6 complete.** Procedural upper body and mass model
+(Step 1); twelve-family base-geometry factory on a shared parameter schema, with
+fore-aft mirror generation (Step 2). See the completion notes at the bottom of
+this file, and
 [PHASE2_GEOMETRY_AND_CONTROL.md](./PHASE2_GEOMETRY_AND_CONTROL.md) for the
 model description. Steps 2–6 have not started; per the development order this
-project is built against, Step 2 does not begin until Step 1 is verified.
+project is built against, each step is verified before the next begins.
 
 ---
 
@@ -383,3 +384,94 @@ being altered as a side effect of a visual improvement.
 - [ ] "Run static equilibrium benchmark" still PASSES with taper and lean
       applied.
 - [ ] `npm run build`, `npm run typecheck`, `npm test` all exit clean.
+
+---
+
+## Phase 2 — Step 2 completion notes
+
+**What shipped in Step 2:**
+
+- **Twelve base families**, all implemented, none placeholders: A0, A1, A2, A3,
+  A4, A5, B0, B2, B3, B4, B5, B6. The UI groups them as symmetric A-series
+  (validation and reference geometry) and fore-aft asymmetric B-series
+  (candidates), because that distinction is scientific rather than cosmetic.
+- **One shared normalized parameter schema** of eleven parameters, with each
+  family *declaring* which it reads. Controls a family ignores are disabled with
+  the reason shown, and both sets are listed by symbol in the diagnostics panel.
+- **Invariants asserted by test**: `W_base` is always the maximum lateral width
+  and `L_base` always the total fore-aft length, for every family and every
+  asymmetry setting; the asymmetry controls split an extent rather than adding to
+  it. Out-of-range values in parameters a family does not read are ignored rather
+  than rejected, so one parameter set can be carried across families.
+- **Fore-aft mirror generation.** B3 is generated as B2's exact reflection, not
+  hand-written to resemble one — verified identical to 0.0 m across all 37
+  stations. `foreAftMirrorParams` returns null where no exact mirror exists
+  (B0, B4, B6), and the UI flags those families, rather than returning something
+  mirror-shaped that is not a mirror.
+- **Raw mass/COM/inertia diagnostics**: per-component target mass, assumed
+  volume, the collider's own volume, density and resulting mass, plus the
+  independently-computed analytic COM beside Rapier's with the disagreement in
+  millimetres and a flag when it exceeds 1 mm.
+- **The plan-view diagram draws the real outline**, and distinguishes a
+  flat family's contact footprint from a rocker's plan silhouette. The
+  theory-section diagram now reads its base dimensions and contact kind from the
+  same geometry the physics is built from, instead of testing for A4 by name.
+
+**The defect found and fixed during Step 2:**
+
+Rapier keeps at most four solver contacts per collider pair. For a convex
+polyhedron resting face-down, its point selection could collapse the contact
+patch — measured at 39 mm on a 0.43 m base — leaving the statue balanced on a
+stamp, injecting energy, and climbing 10-35 mm *with nothing pulling on it*.
+Five of the new families would not stand still, and B2 and B3 — exact mirrors —
+behaved 30x differently. A0 never showed it because box-versus-box has a
+specialised contact path, so a phase of validation on A0 could not have caught
+it.
+
+Fixed structurally, not by tuning: degenerate sub-nanometre footprint edges are
+collapsed, and flat-bottomed bases are handed to the solver as eight wedge
+colliders whose union is exactly the original solid. No damping was added, no
+motion clamped, no geometry changed. The wedge count came from a convergence
+study (4 -> 4.1 mm, 6 -> 2.8 mm, 8 -> 0.00 mm, 12 -> 0.09 mm, 16 -> 0.02 mm
+against a 0.5 mm tolerance).
+
+**Tests: 418 total, all passing** — the 67 from Phase 1 and Step 1 unchanged,
+plus 351 new. New files: `bases/polytope.test.ts`, `bases/footprints.test.ts`,
+`bases/baseFamilies.test.ts`, `bases/mirror.test.ts`,
+`bases/contactStability.test.ts`.
+
+| Required Step 2 test | Where |
+|---|---|
+| Every base-family parameter validator | `baseFamilies.test.ts` — each family, each parameter it reads, driven out of range and to NaN |
+| Mass/COM calculation | `baseFamilies.test.ts` — total mass, base mass fraction, analytic-vs-Rapier COM, per family |
+| Base-family mirror transformation | `mirror.test.ts` — fore-aft and lateral, including which families have no exact mirror |
+| B2/B3 geometrically mirrored | `mirror.test.ts` — half-width profile, bounds, centroid, volume |
+| A0 Phase-1 static equilibrium still passes | `benchmark/staticEquilibrium.test.ts` (unchanged) and `contactStability.test.ts` across all families |
+| Zero rope tension remains at rest | `contactStability.test.ts` — every family, 3 s and 10 s |
+| Geometry construction | `polytope.test.ts`, `footprints.test.ts` |
+
+### Manual test checklist (Step 2)
+
+Verified in headless Chromium against the dev server, zero console errors:
+
+- [x] All twelve families selectable and buildable; each reports total mass
+      4000.00 kg and base extents exactly 0.770 x 1.120 m.
+- [x] Every family stands at REST — 0.000 mm/s and 0.0000 deg/s after settling.
+- [x] Analytic-vs-Rapier COM agreement: 0.000 mm for ten families, 0.72 mm for
+      A5 and 0.019 mm for B5 (the hull faceting deficit, displayed not hidden).
+- [x] Collider overlay draws the eight wedges for flat families and the
+      lofted solid for rockers — the colliders, not the display mesh.
+- [x] Parameter greying is per family: A0 shows 4 of 11 active, B6 shows 7,
+      A5 shows 4 with base height correctly disabled.
+- [x] B6 at 14 deg reports intrinsic lean 14.00 deg split as 0.00 from the body
+      and 14.00 from the base, separate from dynamic pitch.
+- [x] B2 labels its plan view "contact footprint"; A5 labels it "plan
+      silhouette (rocker)" and draws the contact line.
+- [x] Mirror status shown per family, with B0/B4/B6 flagged "NO EXACT MIRROR
+      CONTROL".
+
+### What Step 2 did not do
+
+No family has been run as a walking candidate. Step 2 built and validated the
+geometry; whether any of it changes the response to the validated rope forces is
+Step 4's question, and nothing here has measured it.

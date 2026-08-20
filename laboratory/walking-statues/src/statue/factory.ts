@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import type { BuildContext } from "../physics/types";
+import { polytopeToGeometry } from "./bases/polytope";
 import { getBaseModule } from "./bases/registry";
 import { createStatueBody, type StatueComponent } from "./body";
 import { STATUE_STONE_MATERIAL } from "./materials";
@@ -95,8 +96,19 @@ export function createStatue(
   colliderVisual.name = "statue-collider-overlay";
   colliderVisual.visible = false;
 
-  const baseWire = cloneAsWireframe(baseVisual, COMPONENT_MATERIALS.base);
-  colliderVisual.add(baseWire);
+  // The overlay draws the *colliders*, not the display mesh. For a
+  // flat-bottomed family those are the wedges the solver actually has, which is
+  // the whole point of a collider view — showing the undivided display solid
+  // here would hide the one place the collision model departs from the drawing.
+  const baseColliderPolytopes = baseModule.colliderPolytopes(params);
+  if (baseColliderPolytopes) {
+    for (const piece of baseColliderPolytopes) {
+      colliderVisual.add(new THREE.Mesh(polytopeToGeometry(piece), COMPONENT_MATERIALS.base));
+    }
+  } else {
+    // A0 and A4: the collider is an analytic primitive identical to the mesh.
+    colliderVisual.add(cloneAsWireframe(baseVisual, COMPONENT_MATERIALS.base));
+  }
 
   const torsoWire = new THREE.Mesh(
     new THREE.BoxGeometry(torso.depthX, torso.widthY, torso.heightZ),

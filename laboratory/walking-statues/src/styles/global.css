@@ -862,6 +862,9 @@ input[type="range"]::-moz-range-thumb {
 .dg-axis-head { fill: var(--faint); }
 .dg-ground { stroke: var(--muted); stroke-width: 1.6; }
 .dg-footprint { fill: rgb(131 184 215 / 10%); stroke: var(--blue); stroke-width: 1.1; }
+/* A rocker has no contact patch — it touches along this line through the
+   middle of its plan silhouette. Drawn so the two cases cannot be confused. */
+.dg-contact-line { stroke: var(--blue); stroke-width: 1.6; stroke-dasharray: 4 3; }
 .dg-dim { stroke: rgb(244 239 229 / 22%); stroke-width: 1; }
 .dg-arm { stroke: var(--gold); stroke-width: 1.2; stroke-dasharray: 3 3; }
 .dg-weight { stroke: var(--muted); stroke-width: 1.6; }

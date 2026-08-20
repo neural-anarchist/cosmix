@@ -14,7 +14,7 @@ export function App() {
         Skip to the simulation
       </a>
 
-      <a className="back-link" href="../../">
+      <a className="back-link" href="../../../">
         ← Back to Cosmix
       </a>
 
