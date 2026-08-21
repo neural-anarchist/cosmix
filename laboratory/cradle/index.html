@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Magnetic pendulum cradle — coupled oscillators, a spring–mass analog, and normal mode analysis." />
+  <meta name="theme-color" content="#070b14" />
+  <title>Magnetic Pendulum Cradle — Cosmix</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- KaTeX renders the mathematics in the theory section. Loaded from a CDN,
+       so it needs a network connection; if it fails the raw TeX remains
+       legible rather than the page breaking. -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous" />
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+
+  <link rel="stylesheet" href="style.css" />
+  <script defer src="main.js"></script>
+</head>
+
+<body>
+  <a class="skip-link" href="#section-cradle">Skip to the simulation</a>
+
+  <header class="page-header">
+    <a class="back-link" href="../">← Back to the Laboratory</a>
+    <p class="eyebrow">Coupled oscillators · Normal modes</p>
+    <h1>Magnetic Pendulum Cradle</h1>
+    <p class="lede">
+      A row of equal-length pendulums, each carrying a magnet. Every dipole
+      points the same way in space and stays that way as the pendulums swing,
+      so the coupling comes entirely from how the bobs move relative to one
+      another — and one angle controls whether they attract, repel, or ignore
+      each other completely.
+    </p>
+  </header>
+
+  <nav class="section-nav" aria-label="Section navigation">
+    <a href="#section-cradle">1 · Cradle</a>
+    <a href="#section-analog">2 · Spring–mass analog</a>
+    <a href="#section-compare">3 · Side by side</a>
+    <a href="#section-theory">4 · Normal modes &amp; theory</a>
+  </nav>
+
+  <!-- ================= A · THE CRADLE ================= -->
+  <section class="section" id="section-cradle">
+    <div class="section-head">
+      <p class="section-kicker">Section one</p>
+      <h2>The Cradle</h2>
+      <p class="section-lede">
+        Gravity is kept fully nonlinear and the dipole interaction is evaluated
+        exactly from the true bob positions, then differentiated analytically
+        for the torques. Fixed-step RK4 does the integration.
+      </p>
+    </div>
+
+    <div class="stage-wrap">
+      <canvas id="cradle-canvas" aria-label="Animated magnetic pendulum cradle"></canvas>
+
+      <div class="transport">
+        <button class="btn btn-primary" id="play-toggle" type="button" aria-pressed="true">Pause</button>
+        <button class="btn" id="reset-btn" type="button">Reset</button>
+        <button class="btn" id="defaults-btn" type="button">Restore defaults</button>
+        <button class="btn" id="nudge-btn" type="button">Nudge first bob</button>
+        <span class="transport-readout" id="clock-readout">t = 0.00 s</span>
+        <span class="transport-readout" id="energy-readout">E = 0.000 J</span>
+      </div>
+      <p class="stage-note" id="geometry-readout"></p>
+      <p class="stage-note">
+        Resting position (the magnets pull the cradle off vertical):
+        <span class="chips" id="equilibrium-readout"></span>
+      </p>
+    </div>
+
+    <p class="validation" id="validation" role="status" hidden></p>
+
+    <div class="controls">
+      <div class="control-card control-card-global">
+        <h3>Global parameters</h3>
+
+        <div class="field">
+          <label for="input-N">Number of pendulums <span class="val" id="val-N">3</span></label>
+          <input type="range" id="input-N" min="2" max="5" step="1" value="3" />
+        </div>
+
+        <div class="field">
+          <label for="input-L">Length <em>L</em> (all) <span class="val" id="val-L">0.320 m</span></label>
+          <input type="range" id="input-L" min="0.15" max="0.6" step="0.005" value="0.32" />
+        </div>
+
+        <div class="field">
+          <label for="input-g">Gravity <em>g</em> <span class="val" id="val-g">9.81 m/s²</span></label>
+          <input type="range" id="input-g" min="1" max="20" step="0.01" value="9.81" />
+        </div>
+
+        <div class="field">
+          <label for="input-d">Pivot separation <em>d</em> <span class="val" id="val-d">0.160 m</span></label>
+          <input type="range" id="input-d" min="0.08" max="0.40" step="0.005" value="0.16" />
+        </div>
+
+        <div class="field">
+          <label for="input-alpha">Dipole orientation <em>α</em> <span class="val" id="val-alpha">90.0°</span></label>
+          <input type="range" id="input-alpha" min="0" max="180" step="0.5" value="90" />
+        </div>
+
+        <div class="field">
+          <label for="input-b">Damping <em>b</em> <span class="val" id="val-b">0.020 s⁻¹</span></label>
+          <input type="range" id="input-b" min="0" max="0.5" step="0.005" value="0.02" />
+        </div>
+
+        <p class="hint">
+          <code>α</code> is the direction every north pole points, measured
+          anticlockwise from horizontal. The default <code>90°</code> is N
+          straight up: the magnets sit side-by-side and repel. At
+          <code>0°</code> they lie head-to-tail and attract instead; at
+          <code>54.74°</code> they decouple exactly. Coupling scales as
+          <code>1/d⁵</code>, so separation is the most sensitive control here.
+        </p>
+      </div>
+
+      <div class="control-card control-card-initial">
+        <h3><span class="dot" aria-hidden="true"></span>Initial conditions</h3>
+        <p class="card-note">
+          Applied to the <strong>left-most pendulum only</strong>, measured from
+          its resting position. Changes here do not disturb a run in progress —
+          press <strong>Reset</strong> to launch from the new values.
+        </p>
+
+        <div class="field">
+          <label for="input-theta0">Initial angle <em>θ₀</em> <span class="val" id="val-theta0">0.32 rad</span></label>
+          <input type="range" id="input-theta0" min="-1.2" max="1.2" step="0.01" value="0.32" />
+        </div>
+
+        <div class="field">
+          <label for="input-omega0">Initial rate <em>ω₀</em> <span class="val" id="val-omega0">0.00 rad/s</span></label>
+          <input type="range" id="input-omega0" min="-3" max="3" step="0.05" value="0" />
+        </div>
+
+        <p class="pending" id="initial-pending" hidden>Pending — press Reset to apply</p>
+      </div>
+
+      <div id="pendulum-controls" class="pendulum-controls"></div>
+    </div>
+  </section>
+
+  <!-- ================= B · SPRING–MASS ANALOG ================= -->
+  <section class="section" id="section-analog">
+    <div class="section-head">
+      <p class="section-kicker">Section two</p>
+      <h2>Spring–Mass Analog</h2>
+      <p class="section-lede">
+        We linearize the pendulum equations about the resting position to obtain
+        a system of coupled linear oscillators, which can be represented as
+        masses and springs along a horizontal track. Each pendulum's angular
+        displacement becomes a linear one, $x_i = L\,\eta_i$; gravity becomes a
+        spring to ground and each magnetic interaction becomes a spring between
+        neighbours. Because every pendulum now shares one length, this mapping
+        is exact rather than approximate.
+      </p>
+    </div>
+
+    <div class="stage-wrap">
+      <canvas id="spring-canvas" aria-label="Animated spring and mass analog system"></canvas>
+      <p class="stage-note">
+        Driven directly from the pendulum state above, so the two views stay
+        exactly in step. Vertical springs are the gravitational restoring force;
+        horizontal springs are the magnetic coupling — drawn in rust when
+        <em>G</em>(α) is negative, since the coupling spring is then inverted.
+      </p>
+    </div>
+
+    <div class="panel-grid">
+      <div class="panel">
+        <h3>Derived analog parameters</h3>
+        <div class="table-scroll">
+          <table class="data-table" id="analog-table">
+            <thead>
+              <tr><th>i</th><th>M<sub>i</sub> (kg)</th><th>k<sub>i</sub> (N/m)</th><th>k<sub>i,i+1</sub> (N/m)</th><th>√(k<sub>i</sub>/M<sub>i</sub>)</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p class="fine-print" id="analog-note">
+          $M_i = m_i$, &nbsp; $k_i = m_i g / L$, &nbsp; $k_{ij} = \kappa_{ij}/L^2$.
+          The last column is the uncoupled frequency $\sqrt{k_i/M_i} = \sqrt{g/L}$ —
+          the same pendulum frequency, as it must be.
+        </p>
+      </div>
+
+      <div class="panel">
+        <h3>Current parameters</h3>
+        <dl class="mirror-list" id="analog-mirror"></dl>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= C · SIDE BY SIDE ================= -->
+  <section class="section" id="section-compare">
+    <div class="section-head">
+      <p class="section-kicker">Section three</p>
+      <h2>Side by Side</h2>
+      <p class="section-lede">
+        The nonlinear cradle and its linearized analog, running together on one
+        clock. Watch them agree closely at small amplitude and drift apart as
+        you increase $\theta_0$ — that divergence is exactly the error you
+        accept when you replace $\sin\theta$ with $\theta$.
+      </p>
+    </div>
+
+    <div class="stage-wrap">
+      <canvas id="compare-canvas" aria-label="Pendulum cradle and spring-mass analog side by side"></canvas>
+      <p class="stage-note">
+        Left: the real system, integrated with exact dipole torques and
+        $\sin\theta$ gravity. Right: the matrix model of Section&nbsp;4, driven
+        from the same state.
+      </p>
+    </div>
+  </section>
+
+  <!-- ================= D · THEORY ================= -->
+  <section class="section" id="section-theory">
+    <div class="section-head">
+      <p class="section-kicker">Section four</p>
+      <h2>Normal Modes &amp; Theory</h2>
+      <p class="section-lede">
+        From Newton's laws for each individual pendulum to a single matrix
+        eigenvalue problem, and then to a closed-form answer.
+      </p>
+    </div>
+
+    <div class="prose">
+      <h3>1 · Geometry and the dipole interaction</h3>
+      <p>
+        Pendulum $i$ has its pivot at $x = (i-1)d$ and length $L$, so its bob sits at
+      </p>
+      $$\mathbf{r}_i = \big((i-1)d + L\sin\theta_i,\; -L\cos\theta_i\big)$$
+      <p>
+        Every bob carries the <em>same</em> dipole direction
+        $\hat{\mathbf{s}} = (\cos\alpha,\ \sin\alpha)$, fixed in space — the magnets do
+        not turn as the rods swing. With $\mathbf{m}_i = \mu_i\hat{\mathbf{s}}$ and
+        $\mathbf{r} = \mathbf{r}_j - \mathbf{r}_i$, the dipole–dipole energy is
+      </p>
+      $$U_{ij} = \frac{\mu_0\mu_i\mu_j}{4\pi}\,\frac{1 - 3(\hat{\mathbf{s}}\cdot\hat{\mathbf{r}})^2}{r^3}$$
+      <p>
+        The simulation evaluates this exactly and differentiates it analytically.
+        Near the resting position the bobs sit at the same height, so
+        $\hat{\mathbf{r}} = \hat{\mathbf{x}}$ and $\hat{\mathbf{s}}\cdot\hat{\mathbf{r}} = \cos\alpha$, giving
+      </p>
+      $$\begin{aligned}
+        U_{ij} &\;\longrightarrow\; \frac{\mu_0\mu_i\mu_j}{4\pi}\,\frac{G(\alpha)}{u_{ij}^{3}} \\[4pt]
+        G(\alpha) &= 1 - 3\cos^2\alpha \\[2pt]
+        u_{ij} &= (j-i)\,d + L\,(\theta_j-\theta_i)
+      \end{aligned}$$
+      <p class="callout">
+        $G(\alpha)$ is the whole story of the coupling.
+        At $\alpha = 90^\circ$ — every north pole straight up, the default here —
+        $G = +1$: the magnets sit side-by-side and repel.
+        At $\alpha = 0^\circ$, $G = -2$: they lie head-to-tail and attract.
+        At $\alpha = \arccos(1/\sqrt3) \approx 54.74^\circ$, $G = 0$ exactly and the
+        pendulums decouple no matter how strong the magnets are.
+      </p>
+      <p class="caveat">
+        <strong>Finite magnets.</strong> A point dipole diverges as two bobs meet,
+        and long before that the formula stops describing a real magnet of finite
+        size. The simulation therefore evaluates the interaction at
+        $q = \sqrt{r^2+\varepsilon^2}$ with $\varepsilon = 0.03\,d$ standing in for
+        the magnet's own extent. Because $q$ replaces $r$ inside the
+        <em>potential</em>, and the torques are its exact gradient, energy is still
+        conserved to machine precision. At normal separations the change is a
+        fraction of a percent, and the decoupling at the magic angle survives to
+        about one part in ten thousand.
+      </p>
+
+      <h3>2 · Newton's second law for each pendulum</h3>
+      <p>
+        Each bob is a point mass on a massless rod, so pendulum $i$ has moment of
+        inertia $I_i = m_i L^2$ about its pivot. Summing torques — gravity, linear
+        damping, and one term per magnetic partner — gives $N$ simultaneous
+        equations:
+      </p>
+      $$m_i L^2\,\ddot\theta_i \;=\; -m_i g L\sin\theta_i \;-\; b\,m_i L^2\,\dot\theta_i \;+\; \sum_{j\neq i}\tau_{ij}$$
+      $$\tau_{ij} = -\,\partial U_{ij}/\partial\theta_i$$
+      <p>Written out in full for $N = 3$, with $\tau_{ij} = -\tau_{ji}$ by Newton's third law:</p>
+      $$\begin{aligned}
+        m_1 L^2\ddot\theta_1 &= -m_1 gL\sin\theta_1 - b\,m_1L^2\dot\theta_1 + \tau_{12} + \tau_{13}\\[2pt]
+        m_2 L^2\ddot\theta_2 &= -m_2 gL\sin\theta_2 - b\,m_2L^2\dot\theta_2 - \tau_{12} + \tau_{23}\\[2pt]
+        m_3 L^2\ddot\theta_3 &= -m_3 gL\sin\theta_3 - b\,m_3L^2\dot\theta_3 - \tau_{13} - \tau_{23}
+      \end{aligned}$$
+      <p>
+        Note that every pendulum couples to every other, not just to its
+        neighbour. Because $\kappa \propto 1/d^5$, however, the next-nearest term
+        is $2^5 = 32$ times weaker than the adjacent one.
+      </p>
+
+      <h3>3 · The resting position</h3>
+      <p>
+        Expanding $U_{ij}$ in the small displacement $\delta = L(\theta_j-\theta_i)$,
+      </p>
+      $$U_{ij} \approx \frac{CG}{D^3}\left[\,1 - \frac{3\delta}{D} + \frac{6\delta^2}{D^2}\,\right]$$
+      $$C = \frac{\mu_0\mu_i\mu_j}{4\pi}, \qquad D = (j-i)\,d$$
+      <p>
+        The <strong>linear</strong> term does not vanish: the magnets exert a net
+        pull (or push) even when the rods hang vertically, so $\theta = 0$ is
+        <em>not</em> an equilibrium. The true resting position $\boldsymbol{\theta}^\ast$
+        solves
+      </p>
+      $$-m_i g L\sin\theta^\ast_i + \sum_{j\neq i}\tau_{ij}(\boldsymbol{\theta}^\ast) = 0 \quad\text{for all } i$$
+      <p>
+        which we solve by damped Newton–Raphson. Everything that follows is
+        expanded about $\boldsymbol{\theta}^\ast$, writing $\eta_i = \theta_i - \theta^\ast_i$.
+      </p>
+
+      <h3>4 · Linearization, and the conversion to matrices</h3>
+      <p>
+        The <strong>quadratic</strong> term above is the coupling. Matching it to a
+        difference-form potential $\tfrac12\kappa_{ij}(\theta_i-\theta_j)^2$ gives
+      </p>
+      $$\boxed{\;\kappa_{ij} \;=\; \frac{12\,\mu_0\,\mu_i\mu_j\,G(\alpha)\,L^2}{4\pi\,u_{ij}^{\ast\,5}}\;}$$
+      <p>
+        Note $u^\ast_{ij}$, the separation at the <em>resting</em> position — not the
+        nominal $(j-i)d$. Because $\kappa \propto 1/u^5$, the few-percent gap change
+        caused by the magnets themselves moves the coupling by tens of percent, so
+        using the nominal spacing here would be a real error rather than a rounding
+        one.
+      </p>
+      <p>
+        Substituting $\sin\theta_i \to \theta^\ast_i + \eta_i$ and keeping first order,
+        each equation becomes
+      </p>
+      $$m_i L^2\ddot\eta_i = -\Big(m_i g L\cos\theta^\ast_i + \sum_{j\neq i}\kappa_{ij}\Big)\eta_i + \sum_{j\neq i}\kappa_{ij}\,\eta_j - b\,m_iL^2\dot\eta_i$$
+      <p>
+        Collecting the $N$ equations into one and dropping damping, the system is
+        exactly $\mathbf{M}\ddot{\boldsymbol\eta} + \mathbf{K}\boldsymbol\eta = \mathbf{0}$.
+        For $N = 3$ that reads
+      </p>
+      $$\mathbf{M} = \begin{pmatrix} m_1L^2 & 0 & 0\\ 0 & m_2L^2 & 0\\ 0 & 0 & m_3L^2\end{pmatrix}$$
+      $$\mathbf{K} = \begin{pmatrix}
+          K_{11} & -\kappa_{12} & -\kappa_{13}\\
+          -\kappa_{12} & K_{22} & -\kappa_{23}\\
+          -\kappa_{13} & -\kappa_{23} & K_{33}
+        \end{pmatrix}$$
+      $$\begin{aligned}
+        K_{11} &= m_1gL\cos\theta^\ast_1 + \kappa_{12} + \kappa_{13} + \sigma_1\\
+        K_{22} &= m_2gL\cos\theta^\ast_2 + \kappa_{12} + \kappa_{23} + \sigma_2\\
+        K_{33} &= m_3gL\cos\theta^\ast_3 + \kappa_{13} + \kappa_{23} + \sigma_3
+      \end{aligned}$$
+      <p>In general</p>
+      $$\begin{aligned}
+        M_{ij} &= m_i L^2\,\delta_{ij} \\[3pt]
+        K_{ii} &= m_i g L\cos\theta^\ast_i + \sum_{j\neq i}\kappa_{ij} \;+\; \sigma_i \\[3pt]
+        K_{ij} &= -\kappa_{ij} \qquad (i\neq j)
+      \end{aligned}$$
+      <p>
+        So $\mathbf{K}$ is a diagonal gravity term plus the <em>graph Laplacian</em> of
+        the magnetic couplings. That structure is the reason the results below
+        look the way they do.
+      </p>
+      <p>
+        The extra diagonal piece $\sigma_i$ appears only when the dipoles are
+        <em>oblique</em>. A tilted dipole direction singles out a handedness, breaking
+        the left–right mirror symmetry of the row, so the two members of a pair are
+        stiffened by equal and opposite amounts:
+      </p>
+      $$\sigma_i = \sum_{j\neq i}\operatorname{sgn}(j-i)\,\frac{3\,\mu_0\,\mu_i\mu_j\,L\,\sin 2\alpha}{4\pi\,u_{ij}^{\ast\,4}}$$
+      <p>
+        It couples nothing — it only shifts each pendulum's own restoring torque —
+        and it vanishes identically at $\alpha = 0^\circ$ and $\alpha = 90^\circ$,
+        where $\sin 2\alpha = 0$. That is why the closed form of the next section is
+        exact at those two orientations and approximate between them.
+      </p>
+
+      <h3>5 · The eigenvalue problem</h3>
+      <p>
+        Substituting $\boldsymbol\eta(t) = \mathbf{v}\,e^{i\omega t}$ turns the differential
+        equation into the generalized eigenvalue problem
+      </p>
+      $$\mathbf{K}\mathbf{v} = \lambda\,\mathbf{M}\mathbf{v},\qquad \lambda = \omega^2$$
+      <p>
+        Since $\mathbf{M}$ is diagonal and positive definite we avoid the
+        non-symmetric $\mathbf{M}^{-1}\mathbf{K}$ by symmetrizing: with
+        $\mathbf{S} = \mathbf{M}^{-1/2}$, the matrix $\mathbf{A} = \mathbf{S}\mathbf{K}\mathbf{S}$
+        is symmetric and shares the eigenvalues. A Jacobi rotation sweep
+        diagonalizes it, and the eigenvectors map back as $\mathbf{v} = \mathbf{S}\mathbf{u}$,
+        arriving $\mathbf{M}$-orthonormal:
+      </p>
+      $$\mathbf{v}_k^{\mathsf T}\mathbf{M}\mathbf{v}_l = \delta_{kl}$$
+      <p>
+        A normal mode is a motion in which every pendulum oscillates at the same
+        frequency with a fixed amplitude ratio — the cradle keeps its shape and
+        only breathes. Any initial condition is a superposition of them, and the
+        beating you see above is two modes of slightly different frequency
+        drifting in and out of step.
+      </p>
+
+      <h3>6 · Closed-form solution for the uniform chain</h3>
+      <p>
+        When every pendulum is identical and we keep only nearest-neighbour
+        coupling, $\mathbf{K} = mgL\,\mathbf{I} + \kappa\mathbf{L}_{\text{path}}$, and the
+        path-graph Laplacian has a known spectrum. The result is fully analytic:
+      </p>
+      $$\boxed{\;\omega_k^2 \;=\; \frac{g}{L} \;+\; \frac{4\kappa}{mL^2}\,\sin^2\!\left(\frac{k\pi}{2N}\right),
+        \qquad k = 0,1,\dots,N-1\;}$$
+      $$v_k[i] \;=\; \cos\!\left(\frac{k\pi\,(i+\tfrac12)}{N}\right)$$
+      <p>
+        Two consequences are worth stating plainly. First, $k=0$ gives
+        $\omega_0 = \sqrt{g/L}$ <em>exactly</em>: the mode is uniform, a Laplacian
+        annihilates uniform vectors, and the magnets cannot touch it. Second, the
+        sign of $\kappa$ decides the ordering — with $G(\alpha) &lt; 0$ the coupling
+        is negative and the anti-phase mode is the <em>soft</em> one, the reverse of
+        the familiar spring-coupled case.
+      </p>
+      <p class="caveat">
+        <strong>Where the closed form stops being exact.</strong> It assumes every
+        pendulum identical and only nearest-neighbour coupling. The table below
+        compares it against the numerical solution of the full problem, which
+        includes every pair and the cosine correction from the displaced
+        equilibrium. The gap is the size of everything the closed form leaves
+        out — typically a fraction of a percent, and it grows as you shorten $d$.
+      </p>
+    </div>
+
+    <div class="panel-grid">
+      <div class="panel">
+        <h3>Mass matrix $\mathbf{M}$</h3>
+        <div class="matrix" id="matrix-M"></div>
+      </div>
+      <div class="panel">
+        <h3>Stiffness matrix $\mathbf{K}$</h3>
+        <div class="matrix" id="matrix-K"></div>
+      </div>
+      <div class="panel">
+        <h3>Current parameters</h3>
+        <dl class="mirror-list" id="theory-mirror"></dl>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Normal modes — numerical vs closed form</h3>
+      <div class="table-scroll">
+        <table class="data-table" id="mode-table">
+          <thead>
+            <tr>
+              <th>Mode</th>
+              <th>ω numerical</th>
+              <th>ω closed form</th>
+              <th>Δ</th>
+              <th>T (s)</th>
+              <th>Eigenvector</th>
+              <th>Character</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="mode-transport">
+        <button class="btn" id="free-motion-btn" type="button">Return to free motion</button>
+        <span class="mode-status" id="mode-status">Free motion — all modes superposed</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Modal decomposition of the current state</h3>
+      <p class="fine-print">
+        Projecting the live state onto each mode with
+        $a_k = \mathbf{v}_k^{\mathsf T}\mathbf{M}\boldsymbol\eta$. In the small-angle limit
+        these shares are constants of the motion: energy sloshes freely between
+        <em>pendulums</em> while each <em>mode</em> keeps its own. Raise $\theta_0$ and
+        they drift — the nonlinearity the simulation actually integrates slowly
+        mixes the linear modes, at a rate growing as $\theta_0^2$.
+      </p>
+      <div id="decomposition"></div>
+    </div>
+  </section>
+
+  <footer class="page-footer">
+    <p>
+      Cosmix Laboratory · Hand-written RK4 integrator, Newton equilibrium solver
+      and Jacobi eigensolver. No physics engine; KaTeX renders the mathematics.
+    </p>
+  </footer>
+</body>
+</html>

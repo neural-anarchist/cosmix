@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Cosmix — the cosmos in a box." />
+  <meta name="theme-color" content="#070b14" />
+  <title>Cosmix — The Cosmos in a Box</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet"
+  />
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"
+      }
+    }
+  </script>
+
+  <link rel="stylesheet" href="./assets/css/style.css" />
+  <script type="module" src="./src/main.js"></script>
+
+  <!-- Hero text is typed in by script from empty .type-target spans;
+       the real copy lives in .sr-only duplicates for screen readers.
+       Without JS neither ever fills in, so unhide the duplicates. -->
+  <noscript>
+    <style>
+      .sr-only {
+        position: static;
+        width: auto;
+        height: auto;
+        margin: 0;
+        overflow: visible;
+        clip: auto;
+      }
+    </style>
+  </noscript>
+
+  <!-- If three.js fails to load from the CDN, don't strand the visitor
+       behind the loading screen — reveal the page regardless. That
+       failure also aborts main.js before it ever reaches the hero
+       typewriter, so fill in the hero copy directly here too rather
+       than leaving sighted visitors looking at empty lines. -->
+  <script>
+    setTimeout(function () {
+      document.body.classList.add("is-ready");
+
+      document.querySelectorAll(".type-target[data-type-text]").forEach(function (el) {
+        if (!el.textContent) el.textContent = el.dataset.typeText;
+      });
+      document.querySelectorAll(".intro-label, #explore-button[data-reveal]").forEach(function (el) {
+        el.classList.add("is-visible");
+      });
+    }, 8000);
+  </script>
+</head>
+
+<body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+
+  <div class="loader" id="loader" aria-hidden="true">
+    <span class="loader-mark">✦</span>
+    <span class="loader-text">Charting the system</span>
+  </div>
+
+  <canvas id="cosmos" aria-label="Interactive cosmic map"></canvas>
+  <div class="hero-scrim" aria-hidden="true"></div>
+  <div id="overlay-root" class="overlay-root"></div>
+
+  <header class="site-header">
+    <a class="wordmark" href="./" aria-label="Cosmix home">
+      <span class="wordmark-mark" aria-hidden="true">✦</span>
+      COSMIX
+    </a>
+
+    <nav aria-label="Primary navigation">
+      <a href="./observatory/">Observatory</a>
+      <a href="./trials/">Trials</a>
+      <a href="./laboratory/">Laboratory</a>
+      <a href="./frontier/">Frontier</a>
+      <a href="./team/">About Us</a>
+    </nav>
+
+    <button class="quiet-button" id="motion-toggle" type="button" aria-pressed="false">
+      Reduce motion
+    </button>
+  </header>
+
+  <main id="main-content" class="hero">
+    <p class="eyebrow">
+      <span class="type-target" data-type-text="Physics at the edge of thought" aria-hidden="true"></span>
+      <span class="sr-only">Physics at the edge of thought</span>
+    </p>
+
+    <h1>
+      <span class="type-target" data-type-text="The cosmos," aria-hidden="true"></span><span class="sr-only">The cosmos,</span><br />
+      <em><span class="type-target" data-type-text="in a box." aria-hidden="true"></span><span class="sr-only">in a box.</span></em>
+    </h1>
+
+    <p class="intro-label" data-reveal aria-hidden="true">[ Abstract ]</p>
+    <p class="intro">
+      <span class="type-target" data-type-text="An evolving physics olympiad universe: problems, trials, experiments, and models waiting to be explored." aria-hidden="true"></span>
+      <span class="sr-only">An evolving physics olympiad universe: problems, trials, experiments, and models waiting to be explored.</span>
+    </p>
+
+    <button class="primary-button" id="explore-button" data-reveal type="button">
+      Explore the map <span aria-hidden="true">→</span>
+    </button>
+
+    <p class="hint">
+      <span class="type-target" data-type-text="Drag to orbit · Scroll to zoom · Select a world to enter" aria-hidden="true"></span>
+      <span class="sr-only">Drag to orbit · Scroll to zoom · Select a world to enter</span>
+    </p>
+  </main>
+
+  <aside class="world-panel" id="world-panel" aria-live="polite" aria-hidden="true">
+    <button class="panel-close" id="panel-close" aria-label="Close panel">
+      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+        <line x1="5" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+        <line x1="19" y1="5" x2="5" y2="19" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+      </svg>
+    </button>
+    <p id="panel-kicker" class="panel-kicker"></p>
+    <h2 id="panel-title"></h2>
+    <p id="panel-description"></p>
+    <a id="panel-link" class="panel-cta" href="#"></a>
+    <a id="panel-team" class="panel-cta" href="./team/">Meet the team →</a>
+  </aside>
+
+  <button class="back-button" id="back-to-system" type="button">
+    <span aria-hidden="true">←</span> Back to system
+  </button>
+
+  <p class="corner-label bottom-left">SYSTEM: COSMIX / 01</p>
+  <p class="corner-label bottom-right">DRAG TO NAVIGATE</p>
+</body>
+</html>

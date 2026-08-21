@@ -1,0 +1,754 @@
+/* ============================================================
+   MAGNETIC PENDULUM CRADLE
+   Self-contained stylesheet — carries its own copy of the Cosmix
+   palette so the page works when opened directly from disk.
+   ============================================================ */
+
+:root {
+  --space: #070b14;
+  --space-soft: #111a2c;
+  --panel: rgb(17 26 44 / 45%);
+  --ink: #f4efe5;
+  --muted: #acb4c5;
+  --gold: #d7b470;
+  --blue: #83b8d7;
+  --violet: #9b6bff;
+  --rust: #d68c70;
+  --line: rgb(244 239 229 / 16%);
+  --serif: "Instrument Serif", Georgia, serif;
+  --sans: "DM Sans", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  font-family: var(--sans);
+  line-height: 1.6;
+  background:
+    radial-gradient(120% 80% at 80% -10%, rgb(26 42 74 / 55%), transparent 60%),
+    radial-gradient(90% 70% at 5% 105%, rgb(74 42 107 / 30%), transparent 60%),
+    var(--space);
+}
+
+.skip-link {
+  position: fixed;
+  top: -5rem;
+  left: 1rem;
+  z-index: 20;
+  padding: 0.75rem;
+  color: var(--space);
+  background: var(--ink);
+}
+
+.skip-link:focus {
+  top: 1rem;
+}
+
+code {
+  font-family: var(--mono);
+  font-size: 0.92em;
+  color: var(--gold);
+}
+
+/* ---------- Header ---------- */
+.page-header {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 4rem 2rem 2rem;
+}
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 2rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  transition: color 180ms ease;
+}
+
+.back-link:hover {
+  color: var(--gold);
+}
+
+.eyebrow,
+.section-kicker {
+  margin: 0;
+  color: var(--blue);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 0.8rem 0 1rem;
+  font-family: var(--serif);
+  font-size: clamp(2.6rem, 6vw, 4.6rem);
+  font-weight: 400;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+}
+
+.lede {
+  max-width: 40rem;
+  margin: 0;
+  color: var(--muted);
+  font-size: 1.02rem;
+}
+
+/* ---------- Section nav ---------- */
+.section-nav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  gap: 1.5rem;
+  justify-content: center;
+  padding: 0.9rem 2rem;
+  background: rgb(7 11 20 / 88%);
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(12px);
+}
+
+.section-nav a {
+  color: var(--muted);
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  transition: color 180ms ease;
+}
+
+.section-nav a:hover {
+  color: var(--ink);
+}
+
+/* ---------- Sections ---------- */
+.section {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 4rem 2rem;
+  border-top: 1px solid var(--line);
+}
+
+.section:first-of-type {
+  border-top: 0;
+}
+
+.section-head {
+  margin-bottom: 2rem;
+}
+
+h2 {
+  margin: 0.7rem 0 0.8rem;
+  font-family: var(--serif);
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+h3 {
+  margin: 0 0 0.9rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.section-lede {
+  max-width: 42rem;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+/* ---------- Canvas stages ---------- */
+.stage-wrap {
+  margin-bottom: 1.5rem;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  background: var(--space);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+}
+
+#cradle-canvas {
+  aspect-ratio: 16 / 9;
+  max-height: 62vh;
+}
+
+#spring-canvas {
+  aspect-ratio: 21 / 9;
+  max-height: 40vh;
+}
+
+#compare-canvas {
+  aspect-ratio: 24 / 9;
+  max-height: 46vh;
+}
+
+.stage-note {
+  margin: 0.75rem 0 0;
+  color: rgb(244 239 229 / 42%);
+  font-size: 0.76rem;
+}
+
+.transport {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+  margin-top: 0.9rem;
+}
+
+.transport-readout {
+  margin-left: 0.4rem;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.74rem;
+}
+
+/* ---------- Buttons ---------- */
+.btn {
+  padding: 0.55rem 0.95rem;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  font: inherit;
+  font-size: 0.76rem;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: color 180ms ease, background 180ms ease, border-color 180ms ease;
+}
+
+.btn:hover {
+  color: var(--space);
+  background: var(--gold);
+  border-color: var(--gold);
+}
+
+.btn-primary {
+  color: var(--space);
+  background: var(--ink);
+  border-color: var(--ink);
+  font-weight: 600;
+}
+
+.btn-small {
+  padding: 0.35rem 0.6rem;
+  font-size: 0.7rem;
+}
+
+.btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.btn:disabled:hover {
+  color: var(--ink);
+  background: transparent;
+  border-color: var(--line);
+}
+
+/* ---------- Validation ---------- */
+/* An author-level display value beats the `hidden` attribute, so restore it. */
+.validation[hidden] {
+  display: none;
+}
+
+.validation {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0 0 1.5rem;
+  padding: 0.85rem 1rem;
+  color: var(--gold);
+  background: rgb(215 180 112 / 8%);
+  border-left: 2px solid var(--gold);
+  font-size: 0.8rem;
+}
+
+/* ---------- Mathematics ----------
+   Equation blocks shrink-wrap their contents rather than spanning the column,
+   so each box is exactly as wide as the formula inside it. They are also
+   allowed to break out of the prose measure, which is set for reading prose
+   rather than for matrices — that combination is what keeps every equation
+   scrollbar-free. */
+.katex { font-size: 1em; }
+
+.katex-display {
+  /* Shrink to content, but never exceed the section width. */
+  display: table;
+  width: auto;
+  max-width: 100%;
+  margin: 1.1rem 0;
+  padding: 0.85rem 1.1rem;
+  background: rgb(17 26 44 / 55%);
+  border-left: 2px solid var(--gold);
+  overflow: visible;
+}
+
+.katex-display > .katex {
+  text-align: left;
+  white-space: normal;
+}
+
+/* Last-resort safety valve: if a formula still cannot fit (very narrow
+   viewport), let that one box scroll rather than pushing the page sideways. */
+@media (max-width: 640px) {
+  .katex-display {
+    display: block;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  .katex { font-size: 0.9em; }
+}
+
+/* If the CDN is unreachable the raw TeX is still readable. */
+.katex-missing .prose { font-family: var(--mono); }
+
+.callout {
+  padding: 0.9rem 1rem;
+  background: rgb(131 184 215 / 9%);
+  border-left: 2px solid var(--blue);
+  font-size: 0.86rem !important;
+}
+
+.analytic { color: var(--blue); }
+.delta { color: var(--gold); }
+.dim { color: rgb(244 239 229 / 30%); }
+
+/* ---------- Controls ---------- */
+.controls {
+  display: grid;
+  gap: 1rem;
+  /* 13.5rem lets four cards (global + three pendulums) share one row at the
+     section's max width. */
+  grid-template-columns: repeat(auto-fit, minmax(13.5rem, 1fr));
+}
+
+.pendulum-controls {
+  display: contents;
+}
+
+.control-card {
+  --accent: var(--gold);
+  padding: 1.1rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+}
+
+.control-card h3 {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  color: var(--accent);
+}
+
+.control-card-global {
+  --accent: var(--ink);
+}
+
+/* Initial conditions are staged rather than live, so the card is visually
+   set apart from the parameters that take effect immediately. */
+.control-card-initial {
+  --accent: var(--blue);
+  border-color: rgb(131 184 215 / 35%);
+  background: rgb(131 184 215 / 7%);
+}
+
+.card-note {
+  margin: 0 0 1rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.55;
+}
+
+.card-note strong {
+  color: var(--ink);
+}
+
+.pending {
+  margin: 0.4rem 0 0;
+  padding: 0.4rem 0.6rem;
+  color: var(--gold);
+  background: rgb(215 180 112 / 12%);
+  border-left: 2px solid var(--gold);
+  font-size: 0.7rem;
+}
+
+/* Equilibrium chips */
+.chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-left: 0.3rem;
+}
+
+.chip {
+  padding: 0.15rem 0.45rem;
+  color: var(--accent);
+  background: rgb(244 239 229 / 6%);
+  border-radius: 2px;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  background: var(--accent);
+  border-radius: 50%;
+}
+
+.field {
+  margin-bottom: 0.85rem;
+}
+
+.field label {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 0.3rem;
+  font-size: 0.74rem;
+}
+
+.field em {
+  font-family: var(--mono);
+  font-style: normal;
+  color: var(--muted);
+}
+
+.val {
+  color: var(--accent, var(--gold));
+  font-family: var(--mono);
+  font-size: 0.72rem;
+}
+
+input[type="range"] {
+  width: 100%;
+  height: 2px;
+  appearance: none;
+  background: var(--line);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  background: var(--accent, var(--gold));
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: var(--accent, var(--gold));
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.hint {
+  margin: 1rem 0 0;
+  color: rgb(244 239 229 / 40%);
+  font-size: 0.72rem;
+}
+
+/* ---------- Panels ---------- */
+.panel-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  margin-bottom: 1rem;
+}
+
+.panel {
+  margin-bottom: 1rem;
+  padding: 1.2rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+}
+
+.fine-print {
+  margin: 0.8rem 0 0;
+  color: rgb(244 239 229 / 42%);
+  font-size: 0.74rem;
+}
+
+/* ---------- Tables ---------- */
+.table-scroll {
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.data-table th {
+  padding: 0.4rem 0.6rem 0.5rem;
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-align: left;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.data-table td {
+  padding: 0.5rem 0.6rem;
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  border-bottom: 1px solid rgb(244 239 229 / 7%);
+  white-space: nowrap;
+}
+
+.data-table tr.is-active {
+  background: rgb(215 180 112 / 10%);
+}
+
+.data-table td.character {
+  font-family: var(--sans);
+  color: var(--muted);
+  white-space: normal;
+  min-width: 12rem;
+}
+
+.swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 0.5rem;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+
+.components {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.component {
+  padding: 0.15rem 0.35rem;
+  color: var(--accent);
+  background: rgb(244 239 229 / 6%);
+  border-radius: 2px;
+  font-size: 0.7rem;
+}
+
+/* ---------- Matrices ---------- */
+.matrix-table {
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 0.74rem;
+}
+
+.matrix-table td {
+  padding: 0.3rem 0.7rem;
+  text-align: right;
+  color: var(--ink);
+}
+
+.matrix {
+  position: relative;
+  padding-left: 0.6rem;
+  border-left: 2px solid var(--line);
+  overflow-x: auto;
+}
+
+/* ---------- Mirror list ---------- */
+.mirror-list {
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.mirror-list > div {
+  display: flex;
+  gap: 1rem;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid rgb(244 239 229 / 7%);
+}
+
+.mirror-list dt {
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+.mirror-list dd {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  text-align: right;
+}
+
+/* ---------- Prose / theory ---------- */
+/* The prose column is full width so equations have room; the text inside it is
+   held to a comfortable reading measure instead. */
+.prose {
+  max-width: none;
+  margin-bottom: 2rem;
+}
+
+.prose h3 {
+  margin-top: 2rem;
+  color: var(--blue);
+}
+
+.prose p {
+  max-width: 44rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.eq {
+  margin: 1rem 0;
+  padding: 0.9rem 1rem;
+  color: var(--ink) !important;
+  background: rgb(17 26 44 / 60%);
+  border-left: 2px solid var(--gold);
+  font-family: var(--mono);
+  font-size: 0.82rem !important;
+  overflow-x: auto;
+}
+
+.caveat {
+  padding: 0.9rem 1rem;
+  background: rgb(155 107 255 / 8%);
+  border-left: 2px solid var(--violet);
+  font-size: 0.84rem !important;
+}
+
+.caveat strong {
+  color: var(--ink);
+}
+
+/* ---------- Mode transport ---------- */
+.mode-transport {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  margin-top: 1rem;
+}
+
+.mode-status {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+/* ---------- Decomposition bars ---------- */
+.decomp-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.decomp-label {
+  width: 4.5rem;
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+.decomp-bar {
+  flex: 1;
+  height: 6px;
+  background: rgb(244 239 229 / 8%);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.decomp-bar > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--blue), var(--violet));
+  transition: width 160ms ease;
+}
+
+.decomp-value {
+  width: 3.5rem;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  text-align: right;
+}
+
+/* ---------- Footer ---------- */
+.page-footer {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 2rem 2rem 4rem;
+  border-top: 1px solid var(--line);
+}
+
+.page-footer p {
+  margin: 0;
+  color: rgb(244 239 229 / 38%);
+  font-size: 0.76rem;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 700px) {
+  .page-header,
+  .section,
+  .page-footer {
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+  }
+
+  .section-nav {
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .section-nav a {
+    font-size: 0.68rem;
+  }
+
+  #cradle-canvas {
+    aspect-ratio: 4 / 3;
+  }
+
+  #spring-canvas {
+    aspect-ratio: 16 / 9;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .decomp-bar > span {
+    transition: none;
+  }
+}

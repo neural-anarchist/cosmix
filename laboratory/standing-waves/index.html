@@ -1,0 +1,818 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Vibrating string laboratory — ideal standing waves, fretted geometry, bending stiffness and amplitude-dependent tension, compared quantitatively." />
+  <meta name="theme-color" content="#070b14" />
+  <title>Strings — Cosmix</title>
+
+  <!-- Fonts are cosmetic and fall back to system faces. KaTeX renders the
+       theory section's mathematics and needs a network connection; if the CDN
+       is unreachable the raw LaTeX source stays legible (see .katex-missing in
+       style.css) rather than the page breaking. Every control, computation and
+       plot works with no connection at all. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  />
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous" />
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+
+  <link rel="stylesheet" href="style.css" />
+  <script defer src="main.js"></script>
+</head>
+
+<body>
+  <a class="skip-link" href="#section-lab">Skip to the simulation</a>
+
+  <!-- ==================== HERO ==================== -->
+  <header class="page-header">
+    <a class="back-link" href="../">← Back to the Laboratory</a>
+    <p class="eyebrow">Waves · Elasticity · Musical acoustics</p>
+    <h1>Strings</h1>
+    <p class="lede">
+      The textbook string is perfectly flexible, uniformly tensioned and moves
+      only infinitesimally. A real musical string is none of those things. Four
+      models are built here on the same set of physical parameters, so you can
+      ask a sharper question than “does it vibrate?” — namely
+      <em>which departure from the ideal string is large enough to hear</em>,
+      for the string you have actually described.
+    </p>
+  </header>
+
+  <nav class="section-nav" aria-label="Section navigation">
+    <a href="#section-lab">1 · The string</a>
+    <a href="#section-compare">2 · Model comparison</a>
+    <a href="#section-theory">3 · Theory</a>
+    <a href="#section-measure">4 · What to measure</a>
+  </nav>
+
+  <!-- ==================== 1 · THE STRING ==================== -->
+  <section class="section" id="section-lab">
+    <div class="section-head">
+      <p class="section-kicker">Section one</p>
+      <h2>The String</h2>
+      <p class="section-lede">
+        One string, four models. Every model reads the same parameters, so
+        switching between them changes the physics and nothing else. The ideal
+        string is the baseline against which the other three are measured.
+      </p>
+    </div>
+
+    <div class="model-tabs" role="tablist" aria-label="Physical model">
+      <button class="model-tab" role="tab" type="button" data-model="ideal" aria-selected="true">
+        <span class="model-tab-n">Model 1</span>
+        <span class="model-tab-name">Ideal string</span>
+        <span class="model-tab-sub">Perfectly flexible, constant tension</span>
+      </button>
+      <button class="model-tab" role="tab" type="button" data-model="fret" aria-selected="false">
+        <span class="model-tab-n">Model 2</span>
+        <span class="model-tab-name">Fretted geometry</span>
+        <span class="model-tab-sub">Shorter length, stretched path</span>
+      </button>
+      <button class="model-tab" role="tab" type="button" data-model="stiff" aria-selected="false">
+        <span class="model-tab-n">Model 3</span>
+        <span class="model-tab-name">Stiff string</span>
+        <span class="model-tab-sub">Bending stiffness, inharmonic partials</span>
+      </button>
+      <button class="model-tab" role="tab" type="button" data-model="pluck" aria-selected="false">
+        <span class="model-tab-n">Model 4</span>
+        <span class="model-tab-name">Amplitude tension</span>
+        <span class="model-tab-sub">Large motion, time-varying pitch</span>
+      </button>
+      <button class="model-tab model-tab-all" role="tab" type="button" data-model="all" aria-selected="false">
+        <span class="model-tab-n">Combined</span>
+        <span class="model-tab-name">All effects</span>
+        <span class="model-tab-sub">Every correction at once</span>
+      </button>
+    </div>
+
+    <p class="model-blurb" id="model-blurb"></p>
+
+    <div class="stage-wrap">
+      <canvas id="string-canvas" aria-label="Animated vibrating string"></canvas>
+
+      <div class="legend" id="legend"></div>
+
+      <div class="transport">
+        <button class="btn btn-primary" id="play-toggle" type="button" aria-pressed="true">Pause</button>
+        <button class="btn" id="reset-btn" type="button">Reset clock</button>
+        <button class="btn" id="defaults-btn" type="button">Restore defaults</button>
+        <span class="transport-readout" id="clock-readout">t = 0.000 s</span>
+        <span class="transport-readout" id="slow-readout">1 : 400 slow motion</span>
+      </div>
+
+      <p class="stage-note" id="stage-note"></p>
+    </div>
+
+    <p class="validation" id="validation" role="status" hidden></p>
+
+    <div class="metrics" id="metrics"></div>
+
+    <div class="plot-grid" id="plot-grid">
+      <figure class="plot-card" id="card-frets" data-models="fret all" hidden>
+        <figcaption>
+          <h3>Predicted intonation error along the neck</h3>
+          <p>
+            The geometry model re-evaluated at every fret, holding the setup
+            fixed. The selected fret is marked. The rise toward the nut is the
+            reason luthiers shorten the string slightly at the nut.
+          </p>
+        </figcaption>
+        <canvas id="plot-frets"></canvas>
+        <p class="plot-readout" id="readout-frets"></p>
+      </figure>
+
+      <figure class="plot-card" id="card-spectrum" data-models="stiff all" hidden>
+        <figcaption>
+          <h3>Partial spectrum</h3>
+          <p>
+            Frequency is measured in fundamentals, so the ideal partials (up,
+            dim) fall exactly on the integers. The stiff partials (down,
+            violet) are read against those guide lines: the drift is invisible
+            low down and opens up as the partial number rises.
+          </p>
+        </figcaption>
+        <canvas id="plot-spectrum"></canvas>
+        <p class="plot-readout" id="readout-spectrum"></p>
+      </figure>
+
+      <figure class="plot-card" id="card-deviation" data-models="stiff all" hidden>
+        <figcaption>
+          <h3>Deviation from the harmonic series</h3>
+          <p>
+            The same information in cents, which is how the ear measures it.
+            One hundred cents is a semitone; the dashed line marks roughly the
+            smallest pitch difference a careful listener resolves.
+          </p>
+        </figcaption>
+        <canvas id="plot-deviation"></canvas>
+        <p class="plot-readout" id="readout-deviation"></p>
+      </figure>
+
+      <figure class="plot-card" id="card-tension" data-models="pluck all" hidden>
+        <figcaption>
+          <h3>Predicted pitch shift after the pluck</h3>
+          <p>
+            Cycle-averaged shift of the fundamental against time. The whole
+            curve is the analytic prediction for the current parameters; the
+            marker tracks where the animation has reached.
+          </p>
+        </figcaption>
+        <canvas id="plot-tension"></canvas>
+        <p class="plot-readout" id="readout-tension"></p>
+      </figure>
+    </div>
+
+    <div class="controls">
+      <div class="control-card card-string">
+        <h3><span class="dot" aria-hidden="true"></span>String</h3>
+
+        <div class="field">
+          <label for="in-preset">String type</label>
+          <select id="in-preset" class="control-select">
+            <option value="plain">Plain steel (unwound)</option>
+            <option value="wound">Wound steel (steel core)</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="in-mu">Linear density <em>μ</em> <span class="val" id="val-mu"></span></label>
+          <input type="range" id="in-mu" min="0.15" max="9" step="0.01" value="1.02" />
+        </div>
+
+        <div class="field">
+          <label for="in-diameter">Overall diameter <em>d</em> <span class="val" id="val-diameter"></span></label>
+          <input type="range" id="in-diameter" min="0.2" max="1.6" step="0.01" value="0.41" />
+        </div>
+
+        <div class="field">
+          <label for="in-core">Load-bearing core fraction <span class="val" id="val-core"></span></label>
+          <input type="range" id="in-core" min="0.3" max="1" step="0.01" value="1" />
+        </div>
+
+        <div class="field">
+          <label for="in-youngs">Young's modulus <em>E</em> <span class="val" id="val-youngs"></span></label>
+          <input type="range" id="in-youngs" min="60" max="220" step="1" value="200" />
+        </div>
+
+        <div class="field">
+          <label for="in-tension">Open-string tension <em>T₀</em> <span class="val" id="val-tension"></span></label>
+          <input type="range" id="in-tension" min="20" max="260" step="0.5" value="104" />
+        </div>
+
+        <div class="quickpick">
+          <button class="chip-btn" type="button" data-tool="mu-from-diameter">μ from steel diameter</button>
+          <button class="chip-btn" type="button" data-tool="tune">Retune to current pitch</button>
+        </div>
+
+        <p class="hint">
+          On a wound string the winding carries mass but almost no load, so the
+          <strong>core fraction</strong> sets both the stretching stiffness and
+          the bending stiffness while <em>μ</em> stays the full mass per unit
+          length. A plain string has a core fraction of 1.
+        </p>
+      </div>
+
+      <div class="control-card card-geometry">
+        <h3><span class="dot" aria-hidden="true"></span>Length &amp; fret</h3>
+
+        <div class="field">
+          <label for="in-scale">Scale length <em>L</em><sub>scale</sub> <span class="val" id="val-scale"></span></label>
+          <input type="range" id="in-scale" min="500" max="900" step="1" value="648" />
+        </div>
+
+        <div class="field">
+          <label for="in-fret">Fret number <span class="val" id="val-fret"></span></label>
+          <input type="range" id="in-fret" min="0" max="24" step="1" value="5" />
+        </div>
+
+        <div class="field">
+          <label for="in-length">Vibrating length <em>L</em> <span class="val" id="val-length"></span></label>
+          <input type="range" id="in-length" min="0.12" max="0.9" step="0.001" value="0.4855" />
+        </div>
+
+        <div class="field" data-models="fret all">
+          <label for="in-action">Action at the selected fret <span class="val" id="val-action"></span></label>
+          <input type="range" id="in-action" min="0.2" max="4" step="0.05" value="1" />
+        </div>
+
+        <div class="field" data-models="fret all">
+          <label for="in-fretheight">Fret height <span class="val" id="val-fretheight"></span></label>
+          <input type="range" id="in-fretheight" min="0.4" max="2" step="0.05" value="1" />
+        </div>
+
+        <div class="field" data-models="fret all">
+          <label for="in-nutheight">String height at the nut <span class="val" id="val-nutheight"></span></label>
+          <input type="range" id="in-nutheight" min="0.6" max="3.5" step="0.05" value="1.4" />
+        </div>
+
+        <div class="field" data-models="fret all">
+          <label for="in-pressoffset">Finger contact behind the fret <span class="val" id="val-pressoffset"></span></label>
+          <input type="range" id="in-pressoffset" min="2" max="20" step="0.5" value="8" />
+        </div>
+
+        <div class="field" data-models="fret all">
+          <label for="in-press">Press firmness <span class="val" id="val-press"></span></label>
+          <input type="range" id="in-press" min="0" max="1" step="0.01" value="0.35" />
+        </div>
+
+        <p class="hint">
+          The vibrating length and the scale length are two views of one
+          geometry, tied together by the selected fret — moving either one moves
+          the other. Press firmness is the fraction of the fret's height that
+          the string is pushed <em>below</em> the crown at the finger; 1 means
+          pressed flat to the fingerboard.
+        </p>
+      </div>
+
+      <div class="control-card card-motion">
+        <h3><span class="dot" aria-hidden="true"></span>Motion &amp; view</h3>
+
+        <!-- The combined view is a plucked string, every mode at once, so a
+             single mode number has nothing to drive there. -->
+        <div class="field" data-models="ideal stiff">
+          <label for="in-mode">Mode / partial number <em>n</em> <span class="val" id="val-mode"></span></label>
+          <input type="range" id="in-mode" min="1" max="12" step="1" value="2" />
+        </div>
+
+        <div class="field" data-models="ideal stiff">
+          <label for="in-amplitude">Display amplitude <em>A</em> <span class="val" id="val-amplitude"></span></label>
+          <input type="range" id="in-amplitude" min="0.2" max="6" step="0.1" value="1.5" />
+        </div>
+
+        <div class="field" data-models="stiff all">
+          <label for="in-partials">Partials shown <span class="val" id="val-partials"></span></label>
+          <input type="range" id="in-partials" min="4" max="12" step="1" value="10" />
+        </div>
+
+        <div class="field" data-models="pluck all">
+          <label for="in-pluck">Pluck amplitude <span class="val" id="val-pluck"></span></label>
+          <input type="range" id="in-pluck" min="0.2" max="6" step="0.1" value="2" />
+        </div>
+
+        <div class="field" data-models="pluck all">
+          <label for="in-pluckpos">Pluck position <span class="val" id="val-pluckpos"></span></label>
+          <input type="range" id="in-pluckpos" min="0.04" max="0.5" step="0.01" value="0.2" />
+        </div>
+
+        <div class="field" data-models="pluck all">
+          <label for="in-damping">Damping rate <span class="val" id="val-damping"></span></label>
+          <input type="range" id="in-damping" min="0.2" max="12" step="0.1" value="3" />
+        </div>
+
+        <div class="field">
+          <label for="in-slow">Slow motion <span class="val" id="val-slow"></span></label>
+          <input type="range" id="in-slow" min="20" max="2000" step="10" value="300" />
+        </div>
+
+        <div class="toggles">
+          <label class="toggle" data-models="ideal">
+            <input type="checkbox" id="in-components" checked />
+            <span>Travelling components</span>
+          </label>
+          <label class="toggle" data-models="ideal">
+            <input type="checkbox" id="in-envelope" checked />
+            <span>Envelope</span>
+          </label>
+          <label class="toggle" data-models="stiff">
+            <input type="checkbox" id="in-superpose" checked />
+            <span>Superpose partials</span>
+          </label>
+        </div>
+
+        <div class="quickpick" data-models="stiff all">
+          <button class="chip-btn" type="button" data-preset="thin-long">Thin &amp; long</button>
+          <button class="chip-btn" type="button" data-preset="thick-short">Thick &amp; short</button>
+          <button class="chip-btn" type="button" data-preset="high-tension">High tension</button>
+          <button class="chip-btn" type="button" data-preset="low-tension">Low tension</button>
+        </div>
+
+        <div class="quickpick" data-models="pluck all">
+          <button class="chip-btn" type="button" data-tool="replay">Replay pluck</button>
+        </div>
+
+        <p class="hint">
+          Real fundamentals here are hundreds of hertz, far too fast to watch,
+          so the animation runs in slow motion by the stated factor. Every
+          number reported on this page is in real physical time. Lower the
+          factor to watch a pluck decay; raise it to study one cycle.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 2 · MODEL COMPARISON ==================== -->
+  <section class="section" id="section-compare">
+    <div class="section-head">
+      <p class="section-kicker">Section two</p>
+      <h2>Model Comparison</h2>
+      <p class="section-lede">
+        Each model's prediction for the current parameter state, in cents
+        relative to the ideal string. Cents are used throughout because the ear
+        hears frequency ratios, not differences: a fixed number of cents is the
+        same musical interval at any pitch.
+      </p>
+    </div>
+
+    <div class="insight" id="insight">
+      <p class="insight-kicker">What matters most here?</p>
+      <p class="insight-headline" id="insight-headline"></p>
+      <p class="insight-body" id="insight-body"></p>
+    </div>
+
+    <div class="panel">
+      <h3>Predictions for the current setup</h3>
+      <div class="table-scroll">
+        <table class="data-table" id="compare-table">
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th>Quantity</th>
+              <th>Prediction</th>
+              <th>Shift</th>
+              <th>Reading</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="fine-print">
+        Every entry is computed from the controls above. Shifts are signed:
+        positive means sharp. “n/a” means the effect is switched off by the
+        current parameters — an open string has no fretting geometry, and a
+        string at rest has no amplitude-dependent tension.
+      </p>
+    </div>
+
+    <div class="panel">
+      <h3>Partial-by-partial detail</h3>
+      <div class="table-scroll">
+        <table class="data-table" id="partial-table">
+          <thead>
+            <tr>
+              <th>n</th>
+              <th>Ideal <em>n f</em><sub>1</sub></th>
+              <th>Stiff string</th>
+              <th>Difference</th>
+              <th>Deviation</th>
+              <th>Nearest ideal partial</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="fine-print">
+        The last column is the partial number whose ideal frequency lies closest
+        to the stiff-string partial — once it stops matching <em>n</em>, the
+        overtone has drifted past its own harmonic slot, which is where
+        inharmonicity starts to be audible as a change in timbre rather than a
+        change in pitch.
+      </p>
+    </div>
+  </section>
+
+  <!-- ==================== 3 · THEORY ==================== -->
+  <section class="section" id="section-theory">
+    <div class="section-head">
+      <p class="section-kicker">Section three</p>
+      <h2>From Ideal Waves to Real Strings</h2>
+      <p class="section-lede">
+        Where each model comes from, what it assumes, and where it stops being
+        trustworthy.
+      </p>
+    </div>
+
+    <div class="prose">
+      <h3 class="prose-head">1 · Standing waves and boundary conditions</h3>
+      <p>
+        Take a uniform string of length $L$ (metres), stretched to tension $T$
+        (newtons), with mass per unit length $\mu$ (kilograms per metre). Write
+        $y(x,t)$ for the transverse displacement at distance $x$ along the
+        string at time $t$. If the string is perfectly flexible and the
+        displacement is small, Newton's second law applied to a short element
+        gives the wave equation
+      </p>
+      $$\frac{\partial^2 y}{\partial t^2} = \frac{T}{\mu}\,\frac{\partial^2 y}{\partial x^2}
+        \;\equiv\; v^2\,\frac{\partial^2 y}{\partial x^2},
+        \qquad v = \sqrt{\frac{T}{\mu}}$$
+      <p>
+        so disturbances run along the string at speed $v$ regardless of their
+        shape. The string is clamped at both ends, which is a
+        <em>boundary condition</em> on every solution:
+      </p>
+      $$y(0,t) = y(L,t) = 0 \quad \text{for all } t$$
+      <p>
+        A single travelling wave cannot satisfy that. A pair running in
+        opposite directions can. Adding $A\sin(kx-\omega t)$ and
+        $A\sin(kx+\omega t)$, where $k = 2\pi/\lambda$ is the wavenumber and
+        $\omega = 2\pi f$ the angular frequency, gives
+      </p>
+      $$A\sin(kx-\omega t) + A\sin(kx+\omega t) = 2A\sin(kx)\cos(\omega t)$$
+      <p>
+        The $x$ and $t$ dependence has separated. The shape $\sin(kx)$ no longer
+        moves; only its overall height breathes, at frequency $f$. This is a
+        <strong>standing wave</strong>, and it is what the ideal model draws:
+        the two faint travelling components and the bright resultant they add up
+        to.
+      </p>
+      <p>
+        The left-hand clamp is satisfied automatically. The right-hand clamp
+        demands $\sin(kL) = 0$, so $kL$ must be a whole multiple of $\pi$:
+      </p>
+      $$k_n = \frac{n\pi}{L}, \qquad
+        \lambda_n = \frac{2L}{n}, \qquad n = 1, 2, 3, \dots$$
+      <p>
+        Exactly $n$ half-wavelengths fit between the clamps — that is the entire
+        quantisation story, and it is geometric rather than quantum-mechanical.
+        Since $f = v/\lambda$,
+      </p>
+      $$f_n = \frac{n}{2L}\sqrt{\frac{T}{\mu}}$$
+      <p>
+        with the corresponding motion
+      </p>
+      $$y_n(x,t) = A\sin\!\left(\frac{n\pi x}{L}\right)\cos(2\pi f_n t + \varphi)$$
+      <p>
+        Points where $\sin(n\pi x/L) = 0$ never move at all: these are the
+        <strong>nodes</strong>, at $x = 0,\ L/n,\ 2L/n,\ \dots,\ L$, so mode $n$
+        has $n+1$ of them counting both clamps. Halfway between each pair the
+        sine reaches $\pm 1$ and the string swings furthest: those $n$ points
+        are the <strong>antinodes</strong>. The integer $n$ is the
+        <em>harmonic number</em>, and because $f_n = n f_1$ exactly, the ideal
+        string's overtones form a perfect harmonic series.
+      </p>
+      <p class="callout">
+        <strong>Assumptions, stated plainly.</strong> The string is perfectly
+        flexible — it resists stretching but not bending. Displacements are
+        small enough that the slope $\partial y/\partial x$ is much less than 1,
+        so the length and therefore the tension are effectively unchanged by the
+        motion. The tension is uniform along the string, and so is the linear
+        density. The three models that follow each remove one of these
+        assumptions.
+      </p>
+
+      <h3 class="prose-head">2 · Why fretting changes pitch</h3>
+      <p>
+        Western instruments divide the octave into twelve equal steps, so
+        adjacent semitones differ by a frequency ratio of $2^{1/12}
+        \approx 1.05946$. Since $f_n \propto 1/L$ at fixed tension, raising the
+        pitch by $f$ semitones means shortening the string by that same ratio,
+        and a fret placed a distance $x_f$ from the nut leaves a speaking length
+        $L_{\text{scale}} - x_f$. Setting
+        $L_{\text{scale}}/(L_{\text{scale}}-x_f) = 2^{f/12}$ gives the standard
+        rule
+      </p>
+      $$x_f = L_{\text{scale}}\left(1 - 2^{-f/12}\right),
+        \qquad L_{\text{vib}} = L_{\text{scale}}\,2^{-f/12}$$
+      <p>
+        where $L_{\text{scale}}$ is the nut-to-bridge distance and $f$ the fret
+        number. Note what this implies: if nothing but the length changed,
+        fretting would be exactly in tune, by construction. Every deviation the
+        model reports therefore comes from something else — and the dominant
+        something else is tension.
+      </p>
+      <p>
+        Pressing the string down to the fret bends it out of the straight line
+        it rested on. Because both ends are anchored, a longer path means a
+        stretched string, and a stretched string pulls harder. The simulation
+        computes that path explicitly rather than assuming a tension increase.
+        Writing $y$ for height above the fingerboard, the resting string is the
+        straight line from the nut, at height $h_{\text{nut}}$, to the saddle;
+        the action $a$ at the chosen fret fixes the string's height there at
+        $h_{\text{fret}} + a$, where $h_{\text{fret}}$ is the height of the fret
+        crown. Fretted, the string runs in three straight segments: from the nut
+        down to the finger contact at a distance $\delta$ behind the fret, over
+        the crown, and on to the saddle. Their total, minus the resting length,
+        is the extension $\Delta L$.
+      </p>
+      <p>
+        A string of cross-sectional area $A$ and Young's modulus $E$ stretched
+        by $\Delta L$ from an original length $L_0$ carries an extra tension
+      </p>
+      $$\Delta T \approx \frac{EA}{L_0}\,\Delta L$$
+      <p>
+        which is Hooke's law written for a rod. This page uses
+        $L_0 = L_{\text{scale}}$, the full speaking length, and $A$ is the area
+        of the <em>load-bearing core</em> — on a wound string the winding
+        contributes mass but negligible axial stiffness. Both conventions are
+        worth stating because both matter: a real string is anchored beyond the
+        nut and beyond the bridge, so the length actually free to stretch is
+        longer than $L_{\text{scale}}$ and the true $\Delta T$ is correspondingly
+        smaller. Taking $L_0 = L_{\text{scale}}$ makes this model an upper bound.
+      </p>
+      <p>
+        The fretted note is then the ideal-string prediction with both changes
+        applied — the shorter length raises the pitch as intended, and the extra
+        tension raises it further:
+      </p>
+      $$f = \frac{1}{2L_{\text{vib}}}\sqrt{\frac{T_0 + \Delta T}{\mu}}$$
+      <p>
+        Comparing that with the equal-tempered target
+        $f_{\text{target}} = f_{\text{open}}\,2^{f/12}$, the error is measured
+        in <strong>cents</strong>, hundredths of a semitone, so that 1200 cents
+        is an octave:
+      </p>
+      $$\Delta c = 1200\,\log_2\!\left(\frac{f}{f_{\text{target}}}\right)
+        = 600\,\log_2\!\left(1 + \frac{\Delta T}{T_0}\right)$$
+      <p>
+        The second form follows because the length factors cancel exactly, and
+        it is worth reading twice: under this model the whole intonation error
+        of a fretted note is a statement about the fractional tension rise, and
+        nothing else.
+      </p>
+      <p class="caveat">
+        <strong>Limitations.</strong> This is an idealised side view. It treats
+        the string as three straight segments and the fingerboard as flat,
+        ignoring neck relief, the curvature of the crown, and the width and
+        softness of the fingertip. It assumes the string tension equalises along
+        the whole path, whereas friction at the crown lets the speaking side and
+        the nut side hold different tensions — which pushes the true shift
+        below the value reported here. It ignores the winding structure of a
+        wound string, any deformation of neck or body under the added load, and
+        the string's own bending resistance near the contact points. It is a
+        model of the leading geometric effect, not a complete account of a real
+        instrument.
+      </p>
+
+      <h3 class="prose-head">3 · Why real overtones are inharmonic</h3>
+      <p>
+        A perfectly flexible string resists being stretched but not being bent.
+        A real wire does both: curving it stores elastic energy in the material,
+        which adds a restoring term to the wave equation proportional to the
+        fourth spatial derivative,
+      </p>
+      $$\mu\,\frac{\partial^2 y}{\partial t^2}
+        = T\,\frac{\partial^2 y}{\partial x^2}
+        - E I\,\frac{\partial^4 y}{\partial x^4}$$
+      <p>
+        where $I = \pi r^4/4$ is the second moment of area of a circular
+        cross-section of radius $r$. Bending stiffness costs more energy for
+        sharper curvature, and higher modes are more sharply curved — mode $n$
+        has $n$ times the wavenumber — so the stiffness term penalises the high
+        partials most and pushes them sharp. Working through the substitution
+        $y \propto \sin(n\pi x/L)$ gives partials at
+      </p>
+      $$f_n = n f_1 \sqrt{1 + B n^2}$$
+      <p>
+        with $f_1$ the ideal fundamental of the same string, and an
+        <strong>inharmonicity coefficient</strong> that for a uniform circular
+        string is
+      </p>
+      $$B = \frac{\pi^3 E r^4}{4\,T\,L^2}$$
+      <p>
+        which is dimensionless, as it must be:
+        $[\mathrm{N\,m^{-2}}][\mathrm{m^4}] / ([\mathrm{N}][\mathrm{m^2}])$
+        cancels completely. Read the four dependences one at a time. $B$ grows
+        with $E$, because a stiffer material resists bending more. It grows as
+        the <em>fourth power</em> of the radius, which is why $B$ is by far the
+        most sensitive to gauge — doubling the diameter multiplies the
+        inharmonicity sixteenfold. It falls with tension, because a tighter
+        string is dominated by the tension restoring force and the bending term
+        matters relatively less. And it falls with the square of the length,
+        because a long string is gently curved everywhere.
+      </p>
+      <p>
+        Together these explain a fact every instrument maker knows: short, thick
+        strings under modest tension are strongly inharmonic, which is why the
+        bass strings of a small piano are audibly stretched in their overtones
+        and why piano tuners deliberately tune octaves wide. Long, thin, tightly
+        strung wires are nearly harmonic. Try the four presets in the motion
+        card to see the coefficient swing over two orders of magnitude.
+      </p>
+      <p>
+        Because $f_n$ is no longer an integer multiple of $f_1$, the partials no
+        longer share a common period, and a superposition of them never exactly
+        repeats. The superposition view makes this visible: the waveform drifts
+        rather than closing on itself, and the fixed nodes of a single mode are
+        gone — which is why the simulation stops drawing node markers as soon as
+        more than one partial is present.
+      </p>
+      <p class="caveat">
+        <strong>Limitations.</strong> The expression above is the standard
+        approximation for a uniform circular wire with simply supported ends and
+        small $B$; genuinely clamped ends shift the partials slightly further.
+        A wound string is not a uniform cylinder at all — the winding adds mass
+        without adding much stiffness, so this page evaluates $r$ from the
+        load-bearing core while keeping the full $\mu$. That captures the right
+        physics but the effective core radius of a real wound string is a
+        fitted quantity, not a measured one.
+      </p>
+
+      <h3 class="prose-head">4 · Large-amplitude motion and dynamic tension</h3>
+      <p>
+        The wave equation of Section 1 assumed the tension is constant. That is
+        only true while the string's length is effectively constant, and a
+        displaced string is longer than a straight one. For a curve $y(x)$ with
+        a small slope, the arc length exceeds the base length by
+      </p>
+      $$\int_0^L\!\left(\sqrt{1 + \left(\frac{\partial y}{\partial x}\right)^2} - 1\right)dx
+        \;\approx\; \Delta L_{\text{dyn}}
+        = \frac{1}{2}\int_0^L \left(\frac{\partial y}{\partial x}\right)^{\!2} dx$$
+      <p>
+        using $\sqrt{1+u}\approx 1+u/2$. Because the displacement oscillates,
+        so does this extra length, and with it the tension:
+      </p>
+      $$T(t) \approx T_0 + \frac{EA}{L}\,\Delta L_{\text{dyn}}(t),
+        \qquad
+        f(t) \approx \frac{1}{2L}\sqrt{\frac{T(t)}{\mu}}$$
+      <p>
+        The simulation does not integrate this numerically. It starts from a
+        triangular pluck — the string pulled to a height $a$ at a fraction $p$
+        of its length and released from rest, which is a good description of a
+        plectrum or fingertip leaving the string — and decomposes that shape
+        into normal modes by Fourier analysis. With $x_0 = pL$,
+      </p>
+      $$A_n = \frac{2aL^2}{\pi^2 n^2\, x_0 (L-x_0)}\,\sin\!\left(\frac{n\pi x_0}{L}\right)$$
+      <p>
+        Two things follow immediately. The amplitudes fall as $1/n^2$, so a
+        pluck excites a whole spectrum at once rather than a single harmonic.
+        And any mode with a node at the plucking point gets $A_n = 0$: plucking
+        at exactly $L/5$ silences the fifth partial and every multiple of it,
+        which is why plucking position is a tone control on every stringed
+        instrument.
+      </p>
+      <p>
+        Writing the motion as $y(x,t) = \sum_n a_n(t)\sin(n\pi x/L)$ with
+        $a_n(t) = A_n e^{-\gamma t}\cos(2\pi f_n t)$, the integral above can be
+        done in closed form, because the mode shapes are orthogonal and every
+        cross term integrates to zero:
+      </p>
+      $$\Delta L_{\text{dyn}}(t) = \frac{\pi^2}{4L}\sum_n n^2 a_n(t)^2$$
+      <p>
+        This is exact for the modal sum and costs a few dozen multiplications,
+        so the tension can be evaluated every frame without any numerical
+        quadrature. As the number of modes grows it converges on the exact extra
+        length of the triangle, $a^2/2x_0 + a^2/2(L-x_0)$, which is a useful
+        check that the decomposition is right.
+      </p>
+      <p>
+        It converges slowly, though. Each term carries a factor $n^2 A_n^2
+        \propto 1/n^2$, so a sum truncated at $N$ modes falls short by roughly
+        $0.6/N$ — about one per cent for the sixty-four modes used here. That
+        shortfall is not purely a numerical compromise: a perfect corner is
+        already unphysical, since a real plectrum or fingertip has width and
+        leaves the string rounded, suppressing exactly the high modes being
+        dropped.
+      </p>
+      <p>
+        Each $a_n(t)^2$ carries a factor $\cos^2(2\pi f_n t)$, so the tension
+        pulses at <em>twice</em> each partial's frequency and never goes below
+        $T_0$ — the string is always longer than its rest length, never shorter.
+        Averaged over a cycle, $\langle\cos^2\rangle = \tfrac12$, so the
+        sustained part of the shift is half the instantaneous peak. That
+        cycle-averaged shift is what the plot draws and what the ear hears as
+        pitch: it is largest immediately after the pluck and decays as the
+        amplitude does, at twice the amplitude's decay rate because the effect
+        goes as the square of the displacement. The audible result is a short
+        downward pitch glide after a hard attack, settling to the nominal pitch
+        as the note dies away.
+      </p>
+      <p class="caveat">
+        <strong>This is an approximate, reduced model, not a nonlinear
+        solution.</strong> A full treatment couples the modes to one another
+        through the shared tension, transfers energy between them, and admits
+        transverse–longitudinal coupling and whirling motion. Here the mode
+        shapes and frequencies are held fixed at their small-amplitude values
+        and the computed tension is used only to <em>report</em> a predicted
+        frequency, never fed back into the motion. The small-slope expansion
+        also requires $a \ll L$, which is comfortably satisfied at the
+        millimetre amplitudes offered here but would fail for a violently
+        displaced string. Damping is modelled as a single exponential rate
+        applied equally to all modes; real strings lose their high partials
+        faster than their low ones.
+      </p>
+    </div>
+  </section>
+
+  <!-- ==================== 4 · WHAT TO MEASURE ==================== -->
+  <section class="section" id="section-measure">
+    <div class="section-head">
+      <p class="section-kicker">Section four</p>
+      <h2>What Can Be Measured</h2>
+      <p class="section-lede">
+        Nothing on this page is data. Every number is a prediction from stated
+        assumptions, and the interesting work begins where those predictions
+        meet a real instrument.
+      </p>
+    </div>
+
+    <div class="prose">
+      <h3 class="prose-head">5 · Testing these predictions</h3>
+      <p>
+        The three effects modelled here are all within reach of ordinary
+        equipment, because they are all frequency measurements and frequency is
+        the easiest quantity in physics to measure precisely.
+      </p>
+      <p>
+        <strong>Fretting.</strong> Record the open string and then the same
+        string fretted, using a chromatic tuner that reads cents or an audio
+        analyser. Tune the open string carefully first, since the prediction is
+        a deviation from the equal-tempered target and an out-of-tune reference
+        contaminates every reading. Compare the measured deviation with the
+        model's, then repeat up the neck: the predicted curve along the fretboard
+        has a distinctive shape, and matching that shape is far stronger evidence
+        than matching a single number.
+      </p>
+      <p>
+        <strong>Inharmonicity.</strong> Record a plucked note and take an FFT.
+        Read off the peak frequencies of the first ten or so partials — a long
+        window gives finer frequency resolution, so record a sustained decay
+        rather than the attack. Divide each measured partial by $n$ and by the
+        fundamental: for a harmonic string the result is 1 for every partial,
+        and the departure from 1 grows as $n^2$. Fitting
+        $f_n/(n f_1) = \sqrt{1+Bn^2}$ to those points recovers $B$ directly,
+        which can then be compared with $\pi^3 E r^4/4TL^2$.
+      </p>
+      <p>
+        <strong>Amplitude.</strong> Pluck the same string gently and hard, and
+        track the pitch against time rather than reading a single value — most
+        analysis software will plot a fundamental-frequency track. The
+        prediction is a short sharp transient decaying to a steady pitch, with
+        the initial offset scaling as the square of the pluck amplitude. That
+        square law is the sharpest test available: doubling the displacement
+        should roughly quadruple the initial shift.
+      </p>
+      <p>
+        <strong>Change one variable at a time.</strong> Fret number, string
+        gauge, action height, plucking amplitude and plucking position each
+        appear in a different place in the equations, so varying them one at a
+        time separates effects that a single measurement would confound. Raising
+        the action changes the fretting shift but leaves inharmonicity
+        untouched; changing gauge moves both, and moves inharmonicity far more.
+      </p>
+      <p class="callout">
+        <strong>Fit the uncertain parameters; do not trust the defaults.</strong>
+        Several inputs on this page are known only approximately for any real
+        string. The effective core radius of a wound string, the effective
+        length free to stretch, the true Young's modulus of a drawn and wound
+        wire, and how far a particular player pushes the string past the crown
+        are all quantities to <em>fit</em> from measurements, not to read off a
+        slider. The right way to use this simulator is to fix everything that
+        can be measured directly — scale length, fret positions, diameter,
+        tension, action — and then see whether one consistent choice of the
+        remaining parameters reproduces several independent measurements at
+        once. A model that matches one number is fitted; a model that matches a
+        curve is tested.
+      </p>
+    </div>
+  </section>
+
+  <footer class="page-footer">
+    <p>
+      Cosmix Laboratory · Hand-written canvas rendering, closed-form modal
+      analysis and a self-contained plotting layer. No physics engine and no
+      charting library; KaTeX renders the mathematics.
+    </p>
+    <p>
+      All four models are approximations with stated assumptions, and the
+      numbers they report are predictions rather than measurements.
+    </p>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "cosmix",
+  "version": "0.1.0",
+  "description": "The cosmos in a box — an interactive physics olympiad universe.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "homepage": "https://github.com/neural-anarchist/cosmix",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/neural-anarchist/cosmix.git"
+  },
+  "scripts": {
+    "start": "python3 -m http.server 8080",
+    "check": "node --check src/main.js"
+  }
+}

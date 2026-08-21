@@ -1,0 +1,116 @@
+.team-page {
+  background: #07111f;
+  color: #e8ecf5;
+  font-family: system-ui, sans-serif;
+  min-height: 100vh;
+  padding: 4rem 2rem;
+  /* style.css locks scrolling for the full-bleed map; this page is a
+     normal document and has to scroll. */
+  overflow-y: auto;
+}
+
+.team-header {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.back-link {
+  display: inline-block;
+  color: #9b6bff;
+  text-decoration: none;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+}
+
+.team-header h1 {
+  font-size: 2.4rem;
+  margin: 0 0 0.5rem;
+}
+
+.team-subtitle {
+  color: #8aa3c9;
+  font-size: 1rem;
+}
+
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 2rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.team-card {
+  position: relative;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(155, 107, 255, 0.25);
+  border-radius: 16px;
+  padding: 2rem 1.5rem;
+  text-align: center;
+  backdrop-filter: blur(6px);
+  overflow: hidden;
+  transition: transform 0.3s ease, border-color 0.3s ease;
+}
+
+.team-card:hover {
+  transform: translateY(-6px);
+  border-color: rgba(155, 107, 255, 0.7);
+}
+
+.team-card-glow {
+  position: absolute;
+  top: -40%;
+  left: 50%;
+  width: 160%;
+  height: 160%;
+  background: radial-gradient(circle, rgba(155, 107, 255, 0.25), transparent 60%);
+  transform: translateX(-50%);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+
+.team-card:hover .team-card-glow {
+  opacity: 1;
+}
+
+.team-photo-wrap {
+  width: 110px;
+  height: 110px;
+  margin: 0 auto 1.2rem;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid rgba(155, 107, 255, 0.5);
+  position: relative;
+  z-index: 1;
+}
+
+.team-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.team-name {
+  font-size: 1.15rem;
+  margin: 0 0 0.25rem;
+  position: relative;
+  z-index: 1;
+}
+
+.team-role {
+  font-size: 0.85rem;
+  color: #9b6bff;
+  margin: 0 0 0.8rem;
+  position: relative;
+  z-index: 1;
+}
+
+.team-bio {
+  font-size: 0.9rem;
+  color: #c3cbe0;
+  line-height: 1.5;
+  position: relative;
+  z-index: 1;
+}

@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="The Cosmix Laboratory — interactive physics simulations." />
+  <meta name="theme-color" content="#070b14" />
+  <title>The Laboratory — Cosmix</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap"
+    rel="stylesheet"
+  />
+
+  <link rel="stylesheet" href="../assets/css/style.css" />
+  <link rel="stylesheet" href="../assets/css/lab.css" />
+  <script type="module" src="../src/lab/index.js"></script>
+</head>
+
+<body class="lab-page">
+  <a class="skip-link" href="#lab-grid">Skip to simulations</a>
+
+  <header class="lab-header">
+    <a href="../" class="back-link">← Back to Cosmix</a>
+    <p class="lab-eyebrow">Third orbit · Simulations</p>
+    <h1>The Laboratory</h1>
+    <p class="lab-subtitle">
+      Interactive models that turn abstract laws into systems you can adjust,
+      observe, and test. Every window below is running live — open one to take
+      the controls.
+    </p>
+  </header>
+
+  <main id="lab-grid" class="lab-grid"></main>
+
+  <footer class="lab-footer">
+    <p>
+      Built with plain canvas and hand-written integrators — no physics engine.
+      Each simulation states where it exaggerates a scale to stay watchable.
+    </p>
+  </footer>
+
+  <div class="lab-detail" id="lab-detail" role="dialog" aria-modal="true"
+       aria-labelledby="detail-title" aria-hidden="true">
+    <div class="detail-shell">
+      <header class="detail-header">
+        <div>
+          <p class="detail-kicker" id="detail-kicker"></p>
+          <h2 class="detail-title" id="detail-title"></h2>
+        </div>
+        <div class="detail-actions">
+          <button class="control-button" id="detail-play" type="button" aria-pressed="true">
+            Pause
+          </button>
+          <button class="detail-close" id="detail-close" type="button" aria-label="Close simulation">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <line x1="5" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+              <line x1="19" y1="5" x2="5" y2="19" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <div class="detail-body">
+        <div class="detail-stage">
+          <canvas id="detail-canvas"></canvas>
+        </div>
+
+        <aside class="detail-rail">
+          <section class="rail-section">
+            <h3 class="rail-heading">Controls</h3>
+            <div id="detail-controls"></div>
+          </section>
+
+          <section class="rail-section">
+            <h3 class="rail-heading">Readouts</h3>
+            <div id="detail-readouts" class="readouts"></div>
+          </section>
+
+          <p class="detail-note" id="detail-note"></p>
+        </aside>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

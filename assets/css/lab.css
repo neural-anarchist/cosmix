@@ -1,0 +1,501 @@
+/* ============================================================
+   THE LABORATORY
+   Preview grid + full instrument view. Inherits the palette and
+   type from style.css; overrides the map page's locked scrolling.
+   ============================================================ */
+
+.lab-page {
+  min-height: 100vh;
+  padding: 0 0 5rem;
+  /* style.css locks scrolling for the full-bleed cosmic map; this
+     page is a normal scrolling document. */
+  overflow-y: auto;
+  background:
+    radial-gradient(120% 80% at 78% -10%, rgb(26 42 74 / 55%), transparent 60%),
+    radial-gradient(90% 70% at 10% 110%, rgb(74 42 107 / 32%), transparent 60%),
+    var(--space);
+}
+
+/* ---------- Header ---------- */
+.lab-header {
+  max-width: 62rem;
+  margin: 0 auto;
+  padding: 4.5rem 2rem 3rem;
+}
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 2rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  transition: color 180ms ease;
+}
+
+.back-link:hover {
+  color: var(--gold);
+}
+
+.lab-eyebrow {
+  margin: 0;
+  color: var(--blue);
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.lab-header h1 {
+  margin: 0.75rem 0 1rem;
+  font-family: var(--serif);
+  font-size: clamp(3rem, 7vw, 5.5rem);
+  font-weight: 400;
+  letter-spacing: -0.045em;
+  line-height: 0.9;
+}
+
+.lab-subtitle {
+  max-width: 34rem;
+  margin: 0;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+/* ---------- Preview grid ---------- */
+.lab-grid {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  max-width: 62rem;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+/* Cards are <button> for modal simulations and <a> for ones that are their
+   own page; both need the same box. */
+.lab-card {
+  --accent: var(--gold);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem 1rem 1.4rem;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  text-decoration: none;
+  background: rgb(17 26 44 / 45%);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: border-color 240ms ease, transform 240ms ease, background 240ms ease;
+}
+
+.lab-card:hover,
+.lab-card:focus-visible {
+  background: rgb(17 26 44 / 70%);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  transform: translateY(-3px);
+}
+
+.lab-card:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.lab-card-frame {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--space);
+}
+
+.lab-card-canvas {
+  display: block;
+  width: 100%;
+  /* Fixed ratio keeps every preview the same shape regardless of
+     how the grid reflows. */
+  aspect-ratio: 16 / 10;
+}
+
+.lab-card-open {
+  position: absolute;
+  right: 0.6rem;
+  bottom: 0.6rem;
+  padding: 0.3rem 0.6rem;
+  color: var(--space);
+  background: var(--accent);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0;
+  transform: translateY(0.4rem);
+  transition: opacity 220ms ease, transform 220ms ease;
+}
+
+.lab-card:hover .lab-card-open,
+.lab-card:focus-visible .lab-card-open {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.lab-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.lab-card-kicker {
+  color: var(--accent);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.lab-card-title {
+  font-family: var(--serif);
+  font-size: 1.6rem;
+  line-height: 1.1;
+}
+
+.lab-card-blurb {
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+/* ---------- Footer ---------- */
+.lab-footer {
+  max-width: 62rem;
+  margin: 3.5rem auto 0;
+  padding: 0 2rem;
+}
+
+.lab-footer p {
+  max-width: 34rem;
+  margin: 0;
+  color: rgb(244 239 229 / 40%);
+  font-size: 0.78rem;
+  line-height: 1.7;
+}
+
+/* ---------- Detail view ---------- */
+.lab-detail {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: rgb(4 7 13 / 82%);
+  backdrop-filter: blur(10px);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 260ms ease, visibility 260ms ease;
+}
+
+.lab-detail.is-open {
+  opacity: 1;
+  visibility: visible;
+}
+
+body.detail-open {
+  overflow: hidden;
+}
+
+.detail-shell {
+  --accent: var(--gold);
+  display: flex;
+  flex-direction: column;
+  width: min(72rem, 100%);
+  max-height: 100%;
+  background: rgb(9 14 25 / 96%);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.lab-detail.is-open .detail-shell {
+  animation: detail-rise 320ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+@keyframes detail-rise {
+  from { transform: translateY(1.2rem); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.detail-header {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 1.4rem 1.6rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.detail-kicker {
+  margin: 0 0 0.3rem;
+  color: var(--accent);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.detail-title {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 2rem;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.detail-actions {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.detail-close {
+  display: flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  transition: color 180ms ease, border-color 180ms ease, transform 180ms ease;
+}
+
+.detail-close:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+  transform: rotate(90deg);
+}
+
+.detail-body {
+  display: grid;
+  grid-template-columns: 1fr 17rem;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.detail-stage {
+  display: flex;
+  align-items: center;
+  padding: 1.2rem;
+  min-width: 0;
+}
+
+#detail-canvas {
+  display: block;
+  width: 100%;
+  flex: 1;
+  aspect-ratio: 16 / 10;
+  max-height: 60vh;
+  background: var(--space);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+}
+
+.detail-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+  padding: 1.2rem 1.4rem;
+  border-left: 1px solid var(--line);
+  overflow-y: auto;
+}
+
+.rail-heading {
+  margin: 0 0 0.9rem;
+  color: var(--muted);
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/* ---------- Controls ---------- */
+.control-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.9rem;
+}
+
+.control-row-inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.control-label {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  justify-content: space-between;
+  color: var(--ink);
+  font-size: 0.74rem;
+}
+
+.control-value {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.control-range {
+  width: 100%;
+  height: 2px;
+  appearance: none;
+  background: var(--line);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.control-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  background: var(--accent);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.control-range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: var(--accent);
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.control-select {
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  color: var(--ink);
+  background: rgb(17 26 44 / 90%);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  font-size: 0.76rem;
+}
+
+.control-toggle {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.control-button {
+  padding: 0.5rem 0.85rem;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  transition: color 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+.control-button:hover {
+  color: var(--space);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* ---------- Readouts ---------- */
+.readouts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.readout {
+  display: flex;
+  gap: 0.75rem;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid rgb(244 239 229 / 8%);
+}
+
+.readout-label {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.readout-value {
+  color: var(--ink);
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.detail-note {
+  margin: 0;
+  padding-top: 0.2rem;
+  color: rgb(244 239 229 / 45%);
+  font-size: 0.72rem;
+  line-height: 1.65;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 900px) {
+  .detail-body {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+
+  .detail-rail {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    overflow-y: visible;
+  }
+
+  #detail-canvas {
+    max-height: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .lab-header {
+    padding: 3rem 1.25rem 2rem;
+  }
+
+  .lab-grid,
+  .lab-footer {
+    padding: 0 1.25rem;
+  }
+
+  .lab-detail {
+    padding: 0;
+  }
+
+  .detail-shell {
+    height: 100%;
+    max-height: 100%;
+    border: 0;
+    border-radius: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lab-card,
+  .lab-card-open,
+  .detail-close {
+    transition: none;
+  }
+
+  .lab-detail.is-open .detail-shell {
+    animation: none;
+  }
+}

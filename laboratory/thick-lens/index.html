@@ -1,0 +1,958 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Bottle Lens Laboratory — a thick-lens ray-tracing and heating model for the IYPT 2015 problem 12." />
+  <meta name="theme-color" content="#070b14" />
+  <title>Bottle Lens Laboratory — Cosmix</title>
+
+  <!-- Fonts are purely cosmetic and fall back to system faces; nothing
+       functional depends on them. KaTeX renders the theory section's
+       mathematics and needs a network connection — if the CDN is
+       unreachable the raw LaTeX source stays legible (see .katex-missing
+       below) rather than the page breaking. Every simulation control,
+       computation, and plot works with no connection at all. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  />
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous" />
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+
+  <link rel="stylesheet" href="styles.css" />
+  <script defer src="main.js"></script>
+</head>
+
+<body>
+  <a class="skip-link" href="#section-lab">Skip to the simulation</a>
+
+  <!-- ==================== HERO ==================== -->
+  <header class="page-header">
+    <a class="back-link" href="../">← Back to the Laboratory</a>
+    <p class="eyebrow">IYPT 2015 #12 — Thick Lens</p>
+    <h1>Bottle Lens Laboratory</h1>
+    <p class="lede">
+      Explore when a liquid-filled bottle focuses sunlight strongly enough to
+      create a hot spot. This is an idealized two-dimensional ray-optics and
+      heat-transfer model, not a fire-safety predictor.
+    </p>
+
+    <p class="safety" role="note">
+      <strong>Safety.</strong> Never intentionally focus sunlight with bottles
+      or lenses. This simulator is for studying optics, not for constructing a
+      fire-starting device.
+    </p>
+  </header>
+
+  <nav class="section-nav" aria-label="Section navigation">
+    <a href="#section-lab">1 · Ray laboratory</a>
+    <a href="#section-analysis">2 · Analysis</a>
+    <a href="#section-theory">3 · Theory</a>
+    <a href="#section-questions">4 · Investigations</a>
+  </nav>
+
+  <!-- ==================== 1 · RAY LABORATORY ==================== -->
+  <section class="section" id="section-lab">
+    <div class="section-head">
+      <p class="section-kicker">Section one</p>
+      <h2>Ray laboratory</h2>
+      <p class="section-lede">
+        Every ray below is traced surface by surface with the vector form of
+        Snell's law — there is no thin-lens shortcut anywhere in the code. The
+        bottle is a genuine thick element with four refracting interfaces, so
+        the aberrations you see are consequences of the geometry rather than
+        decoration.
+      </p>
+    </div>
+
+    <div class="stage-wrap">
+      <canvas id="lens-canvas" aria-label="Ray tracing through a liquid-filled bottle"></canvas>
+
+      <div class="legend" aria-label="Ray colour legend">
+        <span class="key"><i style="--c: #f6e7b0"></i>Incoming sunlight</span>
+        <span class="key"><i style="--c: #9fb4cc"></i>Inside the wall</span>
+        <span class="key"><i style="--c: #6fd2e8"></i>Inside the liquid</span>
+        <span class="key"><i style="--c: #f2a049"></i>Exiting toward the target</span>
+        <span class="key"><i style="--c: #b07bff"></i>Total internal reflection</span>
+        <span class="key"><i style="--c: #7d8798"></i>Missed the bottle</span>
+        <span class="key drag-hint">Drag the target screen to move it</span>
+      </div>
+    </div>
+
+    <!-- Persistent metrics -->
+    <div class="metrics" id="metrics">
+      <div class="metric">
+        <span class="metric-label">Paraxial focus</span>
+        <span class="metric-value" id="m-focal">—</span>
+        <span class="metric-sub" id="m-focal-sub">from the rear vertex</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Focal-spot width</span>
+        <span class="metric-value" id="m-spot">—</span>
+        <span class="metric-sub">50 % encircled / enclosed power</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Concentration</span>
+        <span class="metric-value" id="m-conc">—</span>
+        <span class="metric-sub" id="m-conc-sub">mean over the hot region</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Absorbed power</span>
+        <span class="metric-value" id="m-power">—</span>
+        <span class="metric-sub" id="m-power-sub">over the hot patch</span>
+      </div>
+      <div class="metric metric-hot">
+        <span class="metric-label">Target temperature</span>
+        <span class="metric-value" id="m-temp">—</span>
+        <span class="metric-sub" id="m-temp-sub">heating paused</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Model verdict</span>
+        <span class="metric-value metric-status" id="m-status">—</span>
+        <span class="metric-sub">approximate, model-based</span>
+      </div>
+    </div>
+
+    <p class="validation" id="validation" role="status" hidden></p>
+
+    <!-- Presets -->
+    <div class="preset-bar">
+      <span class="preset-label">Scenarios</span>
+      <button class="btn btn-small" data-preset="water-normal" type="button">Water bottle, normal incidence</button>
+      <button class="btn btn-small" data-preset="water-tilted" type="button">Water bottle, tilted</button>
+      <button class="btn btn-small" data-preset="high-index" type="button">High-index liquid</button>
+      <button class="btn btn-small" data-preset="empty" type="button">Empty bottle</button>
+      <button class="btn btn-small" data-preset="sphere" type="button">Idealized sphere comparison</button>
+      <span class="preset-spacer"></span>
+      <button class="btn btn-small" id="btn-autofocus" type="button">Snap target to best focus</button>
+      <button class="btn btn-small" id="btn-random" type="button">Randomize plausible setup</button>
+      <button class="btn btn-small" id="btn-reset-all" type="button">Reset all</button>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+
+      <!-- ---- Geometry ---- -->
+      <div class="control-card card-geometry">
+        <h3><span class="dot" aria-hidden="true"></span>Bottle geometry</h3>
+
+        <div class="field">
+          <label for="in-radius-left">Left cap radius <em>R<sub>L</sub></em> <span class="val" id="val-radius-left">60 mm</span></label>
+          <input type="range" id="in-radius-left" min="20" max="300" step="1" value="60" />
+        </div>
+        <div class="field">
+          <label for="in-radius-right">Right cap radius <em>R<sub>R</sub></em> <span class="val" id="val-radius-right">60 mm</span></label>
+          <input type="range" id="in-radius-right" min="20" max="300" step="1" value="60" />
+        </div>
+        <div class="field">
+          <label for="in-body">Body length <em>L</em> <span class="val" id="val-body">120 mm</span></label>
+          <input type="range" id="in-body" min="0" max="260" step="1" value="120" />
+        </div>
+        <div class="field">
+          <label for="in-diameter">Outer diameter <em>D</em> <span class="val" id="val-diameter">70 mm</span></label>
+          <input type="range" id="in-diameter" min="20" max="140" step="1" value="70" />
+        </div>
+        <div class="field">
+          <label for="in-wall">Wall thickness <em>t</em> <span class="val" id="val-wall">2.0 mm</span></label>
+          <input type="range" id="in-wall" min="0.2" max="8" step="0.1" value="2" />
+        </div>
+        <div class="field">
+          <label for="in-fill">Liquid fill <em>φ</em> <span class="val" id="val-fill">100 %</span></label>
+          <input type="range" id="in-fill" min="0" max="100" step="1" value="100" />
+        </div>
+        <div class="field">
+          <label for="in-tilt">Bottle tilt <em>β</em> <span class="val" id="val-tilt">0.0°</span></label>
+          <input type="range" id="in-tilt" min="-15" max="15" step="0.5" value="0" />
+        </div>
+
+        <p class="hint">
+          A cap radius smaller than the bottle radius is geometrically
+          impossible, so <code>R</code> is silently clamped to
+          <code>D/2</code> and flagged below. The liquid surface always stays
+          horizontal, so tilting the bottle tilts the glass but not the
+          liquid — which is itself a refracting surface whenever the fill is
+          below 100 %.
+        </p>
+      </div>
+
+      <!-- ---- Optics ---- -->
+      <div class="control-card card-optics">
+        <h3><span class="dot" aria-hidden="true"></span>Optical setup</h3>
+
+        <div class="field">
+          <label for="in-n-wall">Wall index <em>n<sub>w</sub></em> <span class="val" id="val-n-wall">1.490</span></label>
+          <input type="range" id="in-n-wall" min="1.35" max="1.65" step="0.005" value="1.49" />
+        </div>
+        <div class="field">
+          <label for="in-n-liquid">Liquid index <em>n<sub>ℓ</sub></em> <span class="val" id="val-n-liquid">1.333</span></label>
+          <!-- Step 0.001, not 0.005: water is 1.333, and a coarser step would
+               silently snap it to 1.335 and leave the quick-pick unmatched. -->
+          <input type="range" id="in-n-liquid" min="1.0" max="1.6" step="0.001" value="1.333" />
+        </div>
+
+        <div class="quickpick" role="group" aria-label="Liquid quick picks">
+          <button class="chip-btn" data-liquid="1.000" type="button">Air 1.000</button>
+          <button class="chip-btn" data-liquid="1.333" type="button">Water 1.333</button>
+          <button class="chip-btn" data-liquid="1.378" type="button">Saltwater 1.378</button>
+          <button class="chip-btn" data-liquid="1.470" type="button">Oil 1.470</button>
+          <button class="chip-btn" data-liquid="1.520" type="button">Glass 1.520</button>
+        </div>
+
+        <div class="field">
+          <label for="in-rays">Number of rays <span class="val" id="val-rays">61</span></label>
+          <input type="range" id="in-rays" min="9" max="101" step="2" value="61" />
+        </div>
+        <div class="field">
+          <label for="in-beam">Beam diameter <span class="val" id="val-beam">50 mm</span></label>
+          <input type="range" id="in-beam" min="5" max="140" step="1" value="50" />
+        </div>
+        <div class="field">
+          <label for="sel-mode">Third-dimension model</label>
+          <select id="sel-mode">
+            <option value="cylindrical" selected>Cylindrical (line focus)</option>
+            <option value="revolved">Rotationally symmetric (point focus)</option>
+          </select>
+        </div>
+
+        <div class="toggles">
+          <label class="toggle"><input type="checkbox" id="tg-rays" checked /><span>Show rays</span></label>
+          <label class="toggle"><input type="checkbox" id="tg-axis" checked /><span>Show principal axis</span></label>
+        </div>
+
+        <p class="hint">
+          Cylindrical and revolved are both <strong>idealized bounds</strong>,
+          not a measurement of one specific bottle — see theory §7. A real,
+          tilted bottle's true concentration sits somewhere between them.
+        </p>
+
+        <details class="drawer control-advanced">
+          <summary>Advanced: ray physics &amp; visualization</summary>
+
+          <div class="field">
+            <label for="in-incidence">Incident angle <em>γ</em> <span class="val" id="val-incidence">0.0°</span></label>
+            <input type="range" id="in-incidence" min="-10" max="10" step="0.5" value="0" />
+          </div>
+          <div class="field">
+            <label for="in-liquid-mu">Liquid absorption <em>μ</em> <span class="val" id="val-liquid-mu">0.0 m⁻¹</span></label>
+            <input type="range" id="in-liquid-mu" min="0" max="50" step="0.5" value="0" />
+          </div>
+
+          <div class="toggles">
+            <label class="toggle"><input type="checkbox" id="tg-paraxial" /><span>Paraxial rays only</span></label>
+            <label class="toggle"><input type="checkbox" id="tg-normals" /><span>Show surface normals</span></label>
+            <label class="toggle"><input type="checkbox" id="tg-fresnel" checked /><span>Physical throughput (Fresnel losses)</span></label>
+            <label class="toggle"><input type="checkbox" id="tg-branching" /><span>Trace reflected sub-rays (branching)</span></label>
+            <label class="toggle"><input type="checkbox" id="tg-dispersion" /><span>Dispersion (R/G/B rays)</span></label>
+            <label class="toggle"><input type="checkbox" id="tg-debug" /><span>Debug: colour media &amp; label events</span></label>
+          </div>
+
+          <p class="hint">
+            Two throughput modes: with physical throughput <strong>off</strong>,
+            every ray is fully transmitted (a fast, purely geometric picture of
+            where the light goes). With it <strong>on</strong>, unpolarised
+            Fresnel transmittance is tracked at every interface, the liquid
+            absorption slider above takes effect (Beer–Lambert, over path
+            length actually spent in the liquid), and — if branching is also
+            on — the reflected fraction at each partial interface is itself
+            traced, recursively, up to a capped depth, to see how much of that
+            "lost" light finds its way back to the target. Branching is a
+            small, separately-reported correction, not folded into the
+            concentration or temperature figures — see the ray-fate panel
+            below.
+          </p>
+          <p class="hint">
+            Dispersion is a <em>visualization</em> only: the three coloured
+            bundles are traced with slightly different indices, but every
+            number reported on this page uses the single central index.
+          </p>
+        </details>
+      </div>
+
+      <!-- ---- Target & heating ---- -->
+      <div class="control-card card-target">
+        <h3><span class="dot" aria-hidden="true"></span>Target &amp; heating</h3>
+
+        <div class="field">
+          <label for="in-target">Target distance <span class="val" id="val-target">50 mm</span></label>
+          <input type="range" id="in-target" min="2" max="320" step="1" value="50" />
+        </div>
+        <div class="field">
+          <label for="in-irradiance">Solar irradiance <em>E₀</em> <span class="val" id="val-irradiance">1000 W/m²</span></label>
+          <input type="range" id="in-irradiance" min="100" max="1400" step="10" value="1000" />
+        </div>
+        <div class="field">
+          <label for="in-alpha-solar">Solar absorptivity <em>α<sub>solar</sub></em> <span class="val" id="val-alpha-solar">0.90</span></label>
+          <input type="range" id="in-alpha-solar" min="0" max="1" step="0.01" value="0.9" />
+        </div>
+        <div class="field">
+          <label for="in-epsilon-thermal">Thermal-IR emissivity <em>ε<sub>thermal</sub></em> <span class="val" id="val-epsilon-thermal">0.90</span></label>
+          <input type="range" id="in-epsilon-thermal" min="0" max="1" step="0.01" value="0.9" />
+        </div>
+        <div class="field">
+          <label for="in-ambient">Ambient temperature <span class="val" id="val-ambient">20 °C</span></label>
+          <input type="range" id="in-ambient" min="-20" max="60" step="1" value="20" />
+        </div>
+        <div class="field">
+          <label for="in-duration">Heating duration <span class="val" id="val-duration">120 s</span></label>
+          <input type="range" id="in-duration" min="10" max="600" step="10" value="120" />
+        </div>
+
+        <label class="toggle"><input type="checkbox" id="tg-radiative" checked /><span>Include radiative loss <em>εσ(T⁴ − T₀⁴)</em></span></label>
+
+        <div class="transport">
+          <button class="btn btn-primary" id="btn-heat-start" type="button">Start heating</button>
+          <button class="btn" id="btn-heat-reset" type="button">Reset heating</button>
+          <span class="transport-readout" id="heat-clock">t = 0.0 s</span>
+        </div>
+
+        <p class="hint">
+          <strong>α<sub>solar</sub></strong> and
+          <strong>ε<sub>thermal</sub></strong> are kept separate on purpose.
+          Kirchhoff's law equates absorptivity and emissivity only at the
+          <em>same wavelength</em>, for a surface in local thermal
+          equilibrium — it does not say a material absorbs sunlight (peaking
+          near 500 nm) and re-radiates its own heat (peaking in the mid
+          infrared, at ordinary temperatures) with the same efficiency. A
+          selective solar absorber is built specifically to have
+          α<sub>solar</sub> ≫ ε<sub>thermal</sub>; setting them equal would
+          hide exactly that possibility.
+        </p>
+
+        <details class="drawer control-advanced">
+          <summary>Advanced: thermal &amp; radiometric detail</summary>
+
+          <div class="field">
+            <label for="in-width">Out-of-plane width <em>W</em> <span class="val" id="val-width">70 mm</span></label>
+            <input type="range" id="in-width" min="5" max="200" step="1" value="70" />
+          </div>
+          <div class="field">
+            <label for="in-capacity">Areal heat capacity <em>C</em> <span class="val" id="val-capacity">150 J/m²K</span></label>
+            <input type="range" id="in-capacity" min="20" max="2000" step="10" value="150" />
+          </div>
+          <div class="field">
+            <label for="in-loss">Loss coefficient <em>h</em> <span class="val" id="val-loss">25 W/m²K</span></label>
+            <input type="range" id="in-loss" min="2" max="200" step="1" value="25" />
+          </div>
+          <div class="field">
+            <label for="in-timescale">Playback speed <span class="val" id="val-timescale">10×</span></label>
+            <input type="range" id="in-timescale" min="1" max="50" step="1" value="10" />
+          </div>
+
+          <p class="hint">
+            The heat capacity and loss coefficient are <em>per unit area</em>
+            — within this lumped model the illuminated patch cancels out of
+            the energy balance, so at a given irradiance the steady
+            temperature does not depend on the patch's area. That is a
+            statement about this equation, not a general claim that a bigger
+            lens can't matter in a real experiment — see theory §9.
+          </p>
+        </details>
+      </div>
+    </div>
+
+    <!-- Sanity checks + assumptions -->
+    <div class="panel-grid">
+      <div class="panel">
+        <h3>Sanity checks</h3>
+        <ul class="checklist" id="sanity-list"></ul>
+      </div>
+
+      <div class="panel">
+        <h3>Model assumptions</h3>
+        <details class="drawer">
+          <summary>What this model does and does not include</summary>
+          <ul class="assumption-list">
+            <li><strong>Two-dimensional meridional section.</strong> Every ray is traced in the plane of the drawing, which contains the bottle's axis. Skew rays — rays that leave the meridional plane — are not traced at all.</li>
+            <li><strong>Perfect surfaces of revolution or extrusion.</strong> The wall has uniform thickness, the caps are exact circular arcs, and there is no neck, shoulder, seam, base petal, label, or mould line.</li>
+            <li><strong>Geometric optics only.</strong> No diffraction, no interference, no scattering from bubbles, condensation, or surface texture. The diffraction limit is ignored, which matters once the predicted spot approaches a few micrometres.</li>
+            <li><strong>Single wavelength.</strong> The reported numbers use one refractive index. The real solar spectrum spans roughly 300–2500 nm, water absorbs strongly in the near infrared, and PET absorbs in the UV — none of that is modelled.</li>
+            <li><strong>Finite-Sun blur, combined in quadrature.</strong> The tracer launches a mathematically parallel beam, but the real Sun subtends about 0.53°, so every focused image is smeared by at least <em>f</em>·Θ ≈ <em>f</em>/108. That blur is combined with the ray-traced spread in quadrature (not by taking whichever is larger), and it is applied only where a dimension is actually focused: the in-plane dimension in cylindrical mode, both transverse dimensions in revolved mode.</li>
+            <li><strong>Cylindrical and revolved concentration are idealized radiometric bounds,</strong> not a measurement of one specific bottle. They convert the same 2D ray trace into a 3D irradiance under two different assumptions about the unseen third dimension; a real bottle, tilted or off-axis, sits somewhere between them.</li>
+            <li><strong>Solar absorptivity ≠ thermal emissivity, in general.</strong> Kirchhoff's law equates the two only at the same wavelength and in thermal equilibrium. Sunlight absorption and a target's own infrared re-radiation sit in different spectral bands, so this model exposes them as independent parameters rather than assuming a selective surface is impossible.</li>
+            <li><strong>Lumped, one-node thermal model.</strong> No lateral conduction inside the target, no conduction into whatever it rests on, no evaporative cooling, no pyrolysis chemistry, no ignition criterion. Its "irradiance, not power, sets the temperature" result is scoped to this equation — a real experiment's aperture, focal geometry, target size, and convective environment can all still make physical size matter.</li>
+            <li><strong>Linearised convection.</strong> A single coefficient <em>h</em> stands in for free convection, which really depends on temperature, orientation, and air motion.</li>
+            <li><strong>Ray-density radiometry.</strong> Irradiance is estimated from the local spacing of the traced rays, deposited into 0.5 mm cells. Near a caustic the true geometric irradiance is formally singular, so the reported peak is a resolution-limited estimate rather than a physical value — and the peak, unlike the mean over the hot region, should be read as indicative only.</li>
+            <li><strong>Fresnel branching is capped and separate.</strong> When enabled, reflected sub-rays are traced recursively up to a fixed depth and reported as an additional, separately-labelled contribution — not merged into the primary concentration or temperature figures.</li>
+          </ul>
+        </details>
+        <p class="fine-print">
+          Every number on this page is a model output, not a measurement.
+          Treat the trends as the useful product and the absolute values as
+          order-of-magnitude estimates.
+        </p>
+      </div>
+
+      <div class="panel">
+        <h3>Developer validation</h3>
+        <details class="drawer">
+          <summary>Run the shipped code against known closed-form results</summary>
+          <p class="panel-lede">
+            These checks call the exact same classes this page uses —
+            <code>BottleGeometry</code>, <code>RayTracer</code>,
+            <code>OpticalAnalyzer</code>, <code>HeatingModel</code> — against
+            Snell's law, the critical angle, a planar slab, the ball-lens and
+            thick-lens closed forms, a tilted half-filled free surface, energy
+            conservation with and without branching, and the finite-Sun
+            quadrature limit. It is a concise on-page sample of the much
+            larger suite this file was developed against.
+          </p>
+          <p class="dev-summary" id="dev-validation-summary">—</p>
+          <ul class="checklist" id="dev-validation-list"></ul>
+          <button class="btn btn-small" id="btn-run-validation" type="button">Re-run validation</button>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 2 · ANALYSIS ==================== -->
+  <section class="section" id="section-analysis">
+    <div class="section-head">
+      <p class="section-kicker">Section two</p>
+      <h2>Analysis</h2>
+      <p class="section-lede">
+        Three views of the same traced bundle: where the energy lands, where
+        each ray crosses the axis, and what happens to every ray that was
+        launched.
+      </p>
+    </div>
+
+    <div class="plot-grid">
+      <figure class="plot-card">
+        <figcaption>
+          <h3>Irradiance across the target plane</h3>
+          <p>Each ray is spread over a tube as wide as its spacing to its neighbours, then deposited into fixed <span id="bin-note">0.5 mm</span> cells — so bunching raises the profile and fanning flattens it, with no smoothing kernel involved. The dashed line marks a concentration of 1, the irradiance the target would receive with no bottle at all.</p>
+        </figcaption>
+        <canvas id="plot-profile" aria-label="Irradiance profile across the target plane"></canvas>
+        <p class="plot-readout" id="readout-profile">Hover the plot for values</p>
+      </figure>
+
+      <figure class="plot-card">
+        <figcaption>
+          <h3>Where the rays go</h3>
+          <p>Axial crossing distance against the height at which each ray entered. A perfect lens would give a horizontal line; the droop at large heights <em>is</em> spherical aberration.</p>
+        </figcaption>
+        <canvas id="plot-focal" aria-label="Axial crossing distance versus entry height"></canvas>
+        <p class="plot-readout" id="readout-focal">Hover the plot for values</p>
+      </figure>
+
+      <figure class="plot-card">
+        <figcaption>
+          <h3>Target temperature</h3>
+          <p>Lumped areal energy balance integrated with RK4. The curve only advances while the heating run is active.</p>
+        </figcaption>
+        <canvas id="plot-temp" aria-label="Target temperature versus time"></canvas>
+        <p class="plot-readout" id="readout-temp">Press “Start heating”</p>
+      </figure>
+
+      <figure class="plot-card">
+        <figcaption>
+          <h3>Ray fate</h3>
+          <p>Where the launched power ends up. Rays lost to total internal reflection or to the barrel wall never reach the target, however bright the spot looks.</p>
+        </figcaption>
+        <div class="fate-wrap">
+          <div class="fate-bar" id="fate-bar"></div>
+          <ul class="fate-legend" id="fate-legend"></ul>
+          <p class="plot-readout" id="fate-note"></p>
+        </div>
+      </figure>
+    </div>
+
+    <!-- Sweep -->
+    <div class="panel sweep-panel">
+      <h3>Explore a sweep</h3>
+      <p class="panel-lede">
+        Re-runs the whole ray trace across the full slider range of one
+        parameter while everything else is held fixed. Roughly 32 samples,
+        computed in place.
+      </p>
+
+      <div class="sweep-controls">
+        <label class="sweep-field">
+          <span>Vary</span>
+          <select id="sel-sweep-x">
+            <option value="nLiquid" selected>Liquid refractive index</option>
+            <option value="capRadius">Cap radius (both ends)</option>
+            <option value="wall">Wall thickness</option>
+            <option value="beam">Beam diameter</option>
+          </select>
+        </label>
+
+        <label class="sweep-field">
+          <span>Measure</span>
+          <select id="sel-sweep-y">
+            <option value="focal" selected>Estimated focal distance</option>
+            <option value="spot">Focal-spot width</option>
+            <option value="conc">Concentration factor</option>
+            <option value="temp">Final target temperature</option>
+          </select>
+        </label>
+
+        <button class="btn btn-primary btn-small" id="btn-sweep-run" type="button">Run sweep</button>
+        <span class="sweep-status" id="sweep-status"></span>
+      </div>
+
+      <canvas id="plot-sweep" aria-label="Parameter sweep result"></canvas>
+      <p class="plot-readout" id="readout-sweep">Choose two quantities and run the sweep</p>
+      <p class="fine-print">
+        The sweep holds the target plane where you left it. If you are hunting
+        for the narrowest achievable spot rather than the spot at a fixed
+        distance, snap the target to best focus first — the two questions have
+        genuinely different answers.
+      </p>
+    </div>
+  </section>
+
+  <!-- ==================== 3 · THEORY ==================== -->
+  <section class="section" id="section-theory">
+    <div class="section-head">
+      <p class="section-kicker">Section three</p>
+      <h2>Theory</h2>
+      <p class="section-lede">
+        Enough to reconstruct the simulation from scratch, and enough to know
+        where to distrust it.
+      </p>
+    </div>
+
+    <div class="prose">
+      <h3 class="prose-head">1 · Snell's law, in the form a computer can use</h3>
+      <p>
+        At every interface the scalar law relates the angles measured from the
+        surface normal:
+      </p>
+      $$n_1 \sin\theta_1 = n_2 \sin\theta_2$$
+      <p>
+        A ray tracer never has the angles, though — it has a unit direction
+        vector $\mathbf{d}$ and a unit normal $\mathbf{n}$. The vector form
+        follows from one physical statement: the component of the wave vector
+        <em>parallel</em> to the interface is continuous across it. Splitting
+        each direction into parts along and across the normal,
+      </p>
+      $$n_1\,\mathbf{d}_\parallel = n_2\,\mathbf{t}_\parallel \quad\Longrightarrow\quad \mathbf{t}_\parallel = \eta\,\mathbf{d}_\parallel, \qquad \eta = n_1/n_2$$
+      <p>
+        which is Snell's law rewritten, since $|\mathbf{d}_\parallel| =
+        \sin\theta_1$. The transmitted ray must still be a unit vector, so its
+        normal component is fixed by normalisation, and reassembling the two
+        parts gives the form used in <code>refract()</code>:
+      </p>
+      $$\mathbf{t} = \eta\,\mathbf{d} + (\eta\cos\theta_1 - \cos\theta_2)\,\mathbf{n}, \qquad \cos\theta_1 = -\mathbf{d}\cdot\mathbf{n}, \qquad \cos\theta_2 = \sqrt{1-\eta^2(1-\cos^2\theta_1)}$$
+      <p>
+        When the quantity under that square root goes negative there is no
+        transmitted direction at all, and the ray is totally internally
+        reflected:
+      </p>
+      $$\eta^2(1-\cos^2\theta_1) > 1 \quad\Longleftrightarrow\quad \sin\theta_1 > n_2/n_1$$
+      <p>
+        The tracer tests exactly this expression, and on failure switches to
+        the reflection law $\mathbf{r} = \mathbf{d} -
+        2(\mathbf{d}\cdot\mathbf{n})\mathbf{n}$. Because the test is made on
+        the same number that would otherwise be square-rooted, no
+        <code>NaN</code> can ever escape into the ray path.
+      </p>
+
+      <h3 class="prose-head">2 · The normal is not a constant</h3>
+      <p>
+        On a circular arc of centre $\mathbf{C}$ and radius $R$, the outward
+        normal at the intersection point $\mathbf{P}$ is
+      </p>
+      $$\mathbf{n} = \frac{\mathbf{P}-\mathbf{C}}{R}$$
+      <p>
+        so it rotates as you move up the surface. A ray entering parallel to
+        the axis at height $y$ meets the front cap at an incidence angle with
+        $\sin\theta_1 = y/R$. That is the whole origin of aberration: the
+        bending is proportional to $\sin\theta_1$ near the axis but falls
+        behind it further out, so outer rays are bent <em>relatively</em> too
+        hard and cross the axis early.
+      </p>
+
+      <h3 class="prose-head">3 · Why a bottle is not a thin lens</h3>
+      <p>
+        A thin lens is defined by the fiction that a ray enters and leaves at
+        the same point. A bottle violates that fiction spectacularly: with a
+        120 mm body, a ray can travel more than a hundred millimetres of glass
+        and liquid between the two curved surfaces, at a height that changes
+        substantially along the way. The tracer therefore performs four
+        sequential refractions,
+      </p>
+      $$\text{air} \to \text{wall} \to \text{liquid} \to \text{wall} \to \text{air}$$
+      <p>
+        each with its own local normal, and never invokes a focal length. For
+        comparison only, the paraxial thick-lens result for a single medium of
+        index $n$ between two surfaces of radii $R_1$ and $R_2$ separated by
+        an axial thickness $d$ is
+      </p>
+      $$\frac{1}{f} = (n-1)\left[\frac{1}{R_1} - \frac{1}{R_2} + \frac{(n-1)\,d}{n\,R_1 R_2}\right]$$
+      <p>
+        with the back focal distance measured from the rear vertex being
+        $f\left[1 - \dfrac{(n-1)d}{nR_1}\right]$. The third term is the
+        thickness correction, and for a bottle it is not small — it typically
+        moves the focus by tens of percent. The simulation reports the
+        <em>traced</em> paraxial focus, which additionally includes the two
+        wall menisci that this formula ignores.
+      </p>
+
+      <h3 class="prose-head">4 · Spherical aberration</h3>
+      <p>
+        Rays at different heights cross the axis at different places. The
+        difference between the marginal and paraxial crossings is the
+        longitudinal aberration,
+      </p>
+      $$\mathrm{LSA} = z_{\text{marginal}} - z_{\text{paraxial}}$$
+      <p>
+        and it is reported live. Because the crossing point varies smoothly
+        with height, the envelope of the exit rays is a cusped surface — a
+        <em>caustic</em> — rather than a point. That is what the bright
+        arrowhead in the ray diagram is, and it is why the narrowest spot sits
+        slightly <em>inside</em> the paraxial focus, at the circle of least
+        confusion. The “where the rays go” plot is a direct measurement of
+        this: a horizontal line would mean a perfect lens.
+      </p>
+      <p>
+        Aberration is a strong function of aperture. Narrow the beam and the
+        droop vanishes; open it to the full bottle diameter and the outer rays
+        can cross the axis at less than half the paraxial distance.
+      </p>
+
+      <h3 class="prose-head">5 · Chromatic aberration</h3>
+      <p>
+        Refractive index depends on wavelength. For water, $n$ falls from
+        about 1.337 in the deep blue to about 1.331 in the red, and the wall
+        material disperses more strongly still. Since the focal distance
+        scales roughly as $1/(n-1)$, a 0.006 spread in index produces a focal
+        shift of order
+      </p>
+      $$\frac{\Delta f}{f} \approx -\frac{\Delta n}{n-1} \approx -\frac{0.006}{0.333} \approx 1.8\%$$
+      <p>
+        The default model is monochromatic and omits dispersion entirely.
+        Switching on the dispersion toggle traces three bundles at $n \pm
+        \delta$ so the separation is visible, but every reported number
+        continues to use the central index. For this problem chromatic
+        aberration is a small effect next to spherical aberration — worth
+        seeing, not worth worrying about.
+      </p>
+
+      <h3 class="prose-head">6 · The Sun is not a point, and the blur depends on geometry</h3>
+      <p>
+        The traced beam is mathematically parallel, but the Sun subtends an
+        angular diameter $\Theta \approx 0.53^\circ$ as seen from Earth. A
+        perfect lens does not image a point source to a point; it images the
+        Sun's disc, so any focus is smeared by at least
+      </p>
+      $$w_{\text{sun}} = f\,\Theta$$
+      <p>
+        where $f$ is the focal distance. This blur and the ray-traced
+        geometric spread are independent contributions — one from the lens's
+        own aberrations, one from the source's finite size — so they are
+        combined the way independent spreads should be, in quadrature, rather
+        than by taking whichever is larger:
+      </p>
+      $$w = \sqrt{w_{\text{traced}}^2 + w_{\text{sun}}^2}$$
+      <p>
+        A spot already comparable in size to the solar blur comes out
+        measurably wider than either term alone under this rule; a
+        $\max(\cdot)$ would simply clamp it to the bigger number and
+        understate the true blur whenever the two are close.
+      </p>
+      <p>
+        Where the blur applies depends on which dimensions are actually
+        <em>focused</em>, which is exactly the cylindrical/revolved choice
+        below. In <strong>revolved</strong> mode the spot is a disc, and by
+        the model's own rotational symmetry the Sun's blur applies equally in
+        both transverse directions — the single radial measure already
+        represents that. In <strong>cylindrical</strong> mode only the
+        in-plane (traced) direction is ever brought to a focus at all; there
+        is no curvature along the cylinder axis, so that direction never had a
+        spot size to blur in the first place, and its extent stays set by the
+        illuminated aperture instead. The quadrature correction above is
+        therefore applied to the focused dimension only, in both modes — it
+        is a difference in <em>which</em> dimensions the blur reaches, not a
+        different formula.
+      </p>
+      <p>
+        This correction changes the reported spot width and everything derived
+        from it (concentration, target irradiance, temperature); it does
+        <em>not</em> touch the irradiance profile plotted above, which remains
+        the unblurred, idealized ray density — the sanity checks say when the
+        Sun's own blur, rather than the traced geometry, is what actually sets
+        the reported spot size.
+      </p>
+
+      <h3 class="prose-head">7 · Two dimensions, three dimensions, and the factor that decides everything</h3>
+      <p>
+        The trace is a meridional section. To turn it into an irradiance you
+        must say what happens in the direction you cannot see, and there are
+        two very different answers.
+      </p>
+      <p>
+        <strong>Revolve the profile</strong> about the axis and you have a body
+        of revolution illuminated end-on. A ray at height $y$ then stands for
+        an entire annulus, so it must be weighted by its circumference, and
+        the focus is a point. The collected power and the spot area both
+        scale as a square:
+      </p>
+      $$C_{\text{revolved}} \approx \left(\frac{D_{\text{beam}}}{w}\right)^{2}$$
+      <p>
+        <strong>Extrude the profile</strong> out of the page by a width $W$
+        and you have a cylindrical lens. There is no focusing whatsoever along
+        the cylinder axis, so every ray carries equal power, the focus is a
+        <em>line</em> of length $W$, and the gain is only first order:
+      </p>
+      $$C_{\text{cylindrical}} \approx \frac{D_{\text{beam}}}{w}$$
+      <p>
+        The consequence is large. A geometry that concentrates 25× as a
+        cylinder concentrates something like 600× when revolved. A real bottle
+        lying on a table in the sun is much closer to the cylindrical case in
+        the plane through its barrel, which is precisely why it scorches
+        rather than instantly ignites. Switching modes here changes only the
+        radiometric bookkeeping, never the traced rays — the ray diagram is
+        identical, and only the numbers move.
+      </p>
+      <p>
+        Both formulas above are <strong>idealized radiometric bounds</strong>
+        of the same 2D trace, not measurements of a specific bottle: one
+        assumes perfect on-axis rotational symmetry, the other a perfectly
+        straight cylinder illuminated exactly broadside. Treat them as the two
+        limiting cases a real, imperfect, possibly-tilted bottle's true
+        concentration sits between, and use the sanity checks' warning when
+        tilt or off-axis incidence makes the revolved-mode number in
+        particular an over-estimate.
+      </p>
+      <p class="callout">
+        To model the classic broadside geometry — sun striking the side of the
+        barrel — set the body length to zero and both cap radii to $D/2$. The
+        profile becomes the circular cross-section of the barrel, and the
+        cylindrical mode then reads it correctly as a line focus.
+      </p>
+
+      <h3 class="prose-head">8 · From ray density to irradiance</h3>
+      <p>
+        Each launched ray is assigned a share of the incident power. In the
+        extruded model a ray spanning a transverse width $\Delta y$ carries
+      </p>
+      $$P_{\text{ray}} = E_0 \cdot \Delta y \cdot W \cdot \tau$$
+      <p>
+        where $\tau$ is the accumulated Fresnel transmittance along its path;
+        in the revolved model the same ray carries the power of its annulus,
+        proportional to $|y|\,\Delta y$. At the target plane each ray is
+        spread across a tube whose width is the spacing to its neighbours
+        there, and the irradiance in a cell is the power deposited in it
+        divided by its area. Where rays bunch, the tube narrows and the
+        irradiance rises; where they fan out it widens and the profile flattens
+        to exactly 1× — the density estimate comes out of the geometry rather
+        than out of a smoothing kernel. The unpolarised Fresnel transmittance
+        used at each interface is the average of the two polarisations,
+      </p>
+      $$R_s = \left[\frac{n_1\cos\theta_1 - n_2\cos\theta_2}{n_1\cos\theta_1 + n_2\cos\theta_2}\right]^2, \qquad R_p = \left[\frac{n_1\cos\theta_2 - n_2\cos\theta_1}{n_1\cos\theta_2 + n_2\cos\theta_1}\right]^2$$
+      $$\tau = \prod_{\text{interfaces}} \left[1 - \tfrac12(R_s+R_p)\right] \cdot e^{-\mu L}$$
+      <p>
+        Four interfaces at near-normal incidence cost roughly 8–10 % in total.
+        Near the rim, where incidence angles climb, the loss grows sharply and
+        eventually becomes total. The optional $e^{-\mu L}$ factor is
+        Beer–Lambert absorption in the liquid, with $\mu$ the adjustable
+        attenuation coefficient and $L$ the path length the ray actually
+        spends in the liquid (not the wall, and not any head-space air above a
+        partial fill) — applied per segment as the ray crosses the liquid,
+        which is exactly equivalent to applying it once over the total path
+        length since exponentials of path length simply multiply.
+      </p>
+      <p>
+        Both loss channels are optional and gated together behind physical
+        throughput mode; with it off, every ray is fully transmitted ($\tau
+        \equiv 1$) for a fast, purely geometric picture. With it on, a further
+        optional <strong>branching</strong> mode traces the reflected fraction
+        at every partial interface — $1-\tau$, not lost to total internal
+        reflection — as its own recursive sub-ray, capped at a fixed depth and
+        pruned once its power falls below a small threshold. Each branch
+        follows the identical event-finding and refraction code as the primary
+        ray; only the starting power and starting direction differ. This is a
+        real, if usually small, physical effect — some reflected light does
+        eventually reach the target after one or more extra bounces — and the
+        ray-fate panel reports exactly how much, separately from the primary
+        power budget, precisely because it is deliberately not folded into the
+        concentration or temperature numbers.
+      </p>
+      <p>
+        This is ray-density radiometry, and it should be treated as an
+        approximation. At a caustic the geometric-optics irradiance is
+        formally infinite; what the bins report is an average over a finite
+        cell, so the peak value depends on the cell size. That is stated in
+        the plot caption rather than hidden.
+      </p>
+
+      <h3 class="prose-head">9 · The thermal model, and what "area cancels" actually claims</h3>
+      <p>
+        The absorbed power over the illuminated patch of area $A$ uses the
+        target's absorptivity <em>for sunlight</em>, $\alpha_{\text{solar}}$:
+      </p>
+      $$P_{\text{abs}} = \alpha_{\text{solar}} \cdot E_{\text{target}} \cdot A$$
+      <p>
+        and the lumped energy balance for that patch, with an areal heat
+        capacity $C$ [J m⁻² K⁻¹] and an areal loss coefficient $h$
+        [W m⁻² K⁻¹], uses a SEPARATE thermal-infrared emissivity,
+        $\varepsilon_{\text{thermal}}$, for the patch's own re-radiation:
+      </p>
+      $$C\,A\,\frac{dT}{dt} = \alpha_{\text{solar}}\,E_{\text{target}}\,A - hA(T-T_0) - \varepsilon_{\text{thermal}}\,\sigma A\,(T^4-T_0^4)$$
+      <p>
+        Every term carries the same factor $A$, so it divides out:
+      </p>
+      $$C\,\frac{dT}{dt} = \alpha_{\text{solar}}\,E_{\text{target}} - h(T-T_0) - \varepsilon_{\text{thermal}}\,\sigma\,(T^4-T_0^4)$$
+      <p>
+        <strong>Within this lumped, one-node model,</strong> that cancellation
+        means the steady temperature is set by <em>irradiance</em>, not by
+        total collected power — a patch that receives a given W/m² reaches the
+        same steady temperature whether it is large or small, because both the
+        heat gained and the heat lost by convection and radiation scale with
+        the same area. This is a real and useful conclusion for comparing two
+        <em>irradiance</em> values, but it is scoped to this equation. It does
+        not say a bigger lens can never matter in practice: a larger aperture
+        also collects a proportionally larger finite-Sun image (section 6),
+        real targets conduct heat laterally and into whatever they rest on,
+        real convection depends on the target's actual size and orientation,
+        and aiming and holding a larger, heavier apparatus in focus is its own
+        practical problem. "Concentration, not size, sets the irradiance" is
+        the honest reading; "size never matters" is not.
+      </p>
+      <p>
+        <strong>$\alpha_{\text{solar}}$ and $\varepsilon_{\text{thermal}}$ are
+        independent parameters, not one value used twice.</strong> Kirchhoff's
+        law of thermal radiation states that spectral absorptivity equals
+        spectral emissivity at the <em>same wavelength</em>, direction, and
+        polarisation, for a surface in local thermal equilibrium — a statement
+        about one wavelength, not about sunlight versus a target's own heat.
+        Incoming sunlight is ~5778 K thermal radiation, peaking (Wien's law)
+        near 500 nm; a target at a few hundred kelvin radiates with a peak in
+        the mid infrared, several micrometres out. A surface's $\alpha(\lambda)$
+        and $\varepsilon(\lambda)$ can differ substantially between those two
+        bands — that difference is precisely how a selective solar absorber is
+        engineered to work, with high $\alpha_{\text{solar}}$ and low
+        $\varepsilon_{\text{thermal}}$ so it soaks up sunlight without
+        efficiently radiating the heat back away. Setting
+        $\varepsilon_{\text{thermal}} = \alpha_{\text{solar}}$ by fiat would
+        make that surface impossible to represent, so the two are independent
+        sliders here, both defaulting to 0.9 as a plausible grey value for an
+        ordinary non-selective dark surface.
+      </p>
+      <p>
+        Including the radiative term matters enormously regardless of which
+        value $\varepsilon_{\text{thermal}}$ takes: at 750 K a surface with
+        $\varepsilon_{\text{thermal}} = 0.9$ radiates about 18 kW m⁻²,
+        comparable to the entire concentrated input at strong concentration,
+        and omitting the term inflates the predicted temperature into
+        nonsense.
+      </p>
+      <p>
+        The ordinary differential equation is integrated with classical
+        fourth-order Runge–Kutta at a step chosen from the local time constant
+        $C/(h + 4\varepsilon_{\text{thermal}}\sigma T^3)$, so the explicit
+        scheme stays comfortably stable even when radiation dominates.
+      </p>
+
+      <h3 class="prose-head">10 · Why a bright spot does not mean ignition</h3>
+      <p>
+        The model reports temperature. It does not report ignition, and the
+        gap between the two is filled with physics this simulation does not
+        contain: the spectral overlap between the solar spectrum and the
+        target's absorption, conduction laterally through the target and
+        downward into whatever it rests on, moisture evaporating and carrying
+        away latent heat, the pyrolysis kinetics that actually govern whether
+        cellulose chars or flames, and the defects of a real bottle. The
+        Sun's finite angular size IS modelled, as a blur on the spot width
+        (section 6) — but only as a uniform disc, with no limb darkening and
+        no accounting for haze, cloud, or partial occlusion. Scorching a dark
+        surface needs a few hundred degrees; sustained ignition of wood or
+        paper is a chemical-kinetic threshold, not a temperature you can read
+        off a graph.
+      </p>
+      <p>
+        The honest reading of an experiment like this is comparative: which
+        geometry concentrates more, how the focus moves with index, how
+        quickly aberration destroys the gain. Those trends are robust. The
+        absolute temperature is not.
+      </p>
+    </div>
+  </section>
+
+  <!-- ==================== 4 · INVESTIGATIONS ==================== -->
+  <section class="section" id="section-questions">
+    <div class="section-head">
+      <p class="section-kicker">Section four</p>
+      <h2>Investigations</h2>
+      <p class="section-lede">
+        Five questions in the spirit of the original tournament problem. Each
+        card sets up the sweep that answers it.
+      </p>
+    </div>
+
+    <div class="question-grid">
+      <article class="question-card">
+        <h3>How does focal distance depend on the liquid's refractive index?</h3>
+        <p>
+          Predict the trend before you run it. A lens works only through the
+          index <em>contrast</em>, so what should happen as the liquid index
+          approaches that of the wall? And as it approaches 1?
+        </p>
+        <button class="btn btn-small" data-sweep="nLiquid|focal" type="button">Set up this sweep</button>
+      </article>
+
+      <article class="question-card">
+        <h3>Which bottle curvature produces the narrowest focal spot?</h3>
+        <p>
+          Sharper caps bend light harder, but they also aberrate harder. Snap
+          the target to best focus first, then sweep — otherwise you are
+          measuring how far the focus moved, not how good it is.
+        </p>
+        <button class="btn btn-small" data-sweep="capRadius|spot" type="button">Set up this sweep</button>
+      </article>
+
+      <article class="question-card">
+        <h3>How does a cylindrical bottle differ from a spherical one?</h3>
+        <p>
+          Switch the third-dimension model and watch the concentration factor,
+          not the ray diagram — the rays are identical. The gain is squared in
+          one case and linear in the other. Which one is the bottle on the
+          table?
+        </p>
+        <button class="btn btn-small" data-sweep="capRadius|conc" type="button">Set up this sweep</button>
+      </article>
+
+      <article class="question-card">
+        <h3>How do wall thickness and wall index affect aberration?</h3>
+        <p>
+          The wall is a thin meniscus with nearly equal radii on both faces,
+          so its own power is small. Does that mean it is irrelevant? Watch the
+          “where the rays go” plot as you thicken it.
+        </p>
+        <button class="btn btn-small" data-sweep="wall|spot" type="button">Set up this sweep</button>
+      </article>
+
+      <article class="question-card">
+        <h3>Why does a bright focal spot not automatically imply ignition?</h3>
+        <p>
+          Push the concentration until the model reports rapid heating, then
+          switch the radiative loss off and on. Which term actually stops the
+          temperature? Then read the assumptions drawer and count how many
+          missing effects all push the same way.
+        </p>
+        <button class="btn btn-small" data-sweep="beam|temp" type="button">Set up this sweep</button>
+      </article>
+    </div>
+  </section>
+
+  <footer class="page-footer">
+    <p>
+      Hand-written vector ray tracer, ray-density radiometry, and an RK4
+      lumped thermal model — no optics library, no physics engine, no build
+      step. Read <code>main.js</code>; every physical assumption is commented
+      at the point where it is made.
+    </p>
+    <p class="footer-safety">
+      Again: do not attempt to focus sunlight with bottles. Study the model,
+      not the fire.
+    </p>
+  </footer>
+</body>
+</html>
