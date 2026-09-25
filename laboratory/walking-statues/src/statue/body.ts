@@ -82,7 +82,7 @@ export interface StatueBody {
  * regression tests can build the *same* body headlessly in Node. Before this
  * split there was no way to assert on the physics without a WebGL context,
  * which is a large part of why the force-accumulation bug survived a whole
- * phase of manual testing (see PHASE1_FORCE_CONTACT_AUDIT.md).
+ * phase of manual testing (see docs/decisions/ADR-001-force-and-torque-reset.md).
  *
  * Mass properties are never set directly in the normal path: each collider gets
  * a density computed from its target sub-mass and its analytic volume, and
@@ -152,9 +152,9 @@ export function createStatueBody(
         .setDensity(headDensity),
       component: "head",
       approximation:
-        "Blocky Moai head collided as an inscribed sphere of radius H_head/2 — a " +
-        "conservative, deliberately simple stand-in retained unchanged from the " +
-        "validated Phase 1 configuration.",
+        "Blocky Moai head collided as an inscribed sphere, radius half the head " +
+        "height — a deliberately simple stand-in, kept unchanged since it was " +
+        "first checked against the model's static-equilibrium and force-ramp tests.",
       targetMassKg: head.massKg,
       volumeM3: headVolume
     }

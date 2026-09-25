@@ -19,12 +19,12 @@ const RADIAL_SEGMENTS = 28;
  * roll limit from the base shape itself, so the maximum practical rocking
  * amplitude in this family is set entirely by the torso/head COM and the
  * applied forces, not by a heel/toe facet catching the ground. See
- * PHYSICS_MODEL.md.
+ * MODEL_SCOPE.md.
  */
 export const a4LateralRocker: BaseGeometryModule = {
   id: "A4",
   label: "A4 — Lateral cylindrical rocker",
-  summary: "The validated Phase 1 rocker, and the smooth control for the faceted rocker families.",
+  summary: "The reference rocker shape (a smooth cylinder), and the control for the faceted rocker shapes below.",
   usesParameters: [
     // R_lat is not a control here: for a cylinder it is *defined* as W_base/2,
     // and offering a separate radius that silently disagreed with the stated
@@ -54,7 +54,7 @@ export const a4LateralRocker: BaseGeometryModule = {
       massKg: params.baseMassFraction * M,
       // Line contact: no finite tipping lever arm, so no static tipping
       // threshold exists for this family. Stability is a rolling-equilibrium
-      // question instead (PHYSICS_MODEL.md).
+      // question instead (MODEL_SCOPE.md).
       contactHalfWidthY: 0,
       contactHalfWidthYLeft: 0,
       contactHalfWidthYRight: 0,

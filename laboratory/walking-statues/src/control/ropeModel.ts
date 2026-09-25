@@ -11,7 +11,7 @@ export type RopeSide = "left" | "right";
  *
  * This replaces the Phase 1 model, which applied a hardcoded world-space
  * `(0, ±F, 0)` force and separately fabricated an unrelated rope line for
- * display (see PHASE1_FORCE_CONTACT_AUDIT.md §7).
+ * display (see docs/decisions/ADR-002-single-rope-geometry.md).
  */
 export interface RopeGeometry {
   /** Where the haulers stand: WORLD coordinates, meters (x fwd, y lat, z up). */

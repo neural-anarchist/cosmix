@@ -18,7 +18,7 @@ const scratchEuler = new THREE.Euler();
  * inverse: any three-angle decomposition degenerates near gimbal lock, and
  * roll/pitch stop being independent once either grows large. It is adequate
  * for this project because a run is already flagged as fallen well before
- * that regime (see PHYSICS_MODEL.md).
+ * that regime (see MODEL_SCOPE.md).
  */
 export function quaternionToRollPitchYaw(
   x: number,

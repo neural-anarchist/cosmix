@@ -59,7 +59,7 @@ export const DEFAULT_STATUE_PARAMS: StatueParams = {
 
   // A0 is the default rather than A4: a tall statue's COM sits well above
   // any realistic rocker radius, which makes a free cylindrical rocker
-  // passively *unstable* at rest (see Theory section 5 / PHYSICS_MODEL.md)
+  // passively *unstable* at rest (see Theory section 5 / docs/decisions/ADR-005-a4-rocker-stability.md)
   // — a real and important finding, but a poor out-of-the-box first
   // impression. A4 is one dropdown selection away.
   baseFamily: "A0",

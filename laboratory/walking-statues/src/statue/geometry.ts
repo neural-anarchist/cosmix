@@ -184,7 +184,7 @@ export function computeStatueGeometry(params: StatueParams): StatueGeometry {
 
   // Taper narrows the torso from the shoulders (top) downward. The collider is
   // a single uniform cuboid at the *mean* cross-section — a documented
-  // approximation of a frustum (see PHASE2_GEOMETRY_AND_CONTROL.md). At taper 0
+  // approximation of a frustum (see docs/archive/PHASE2_GEOMETRY_AND_CONTROL.md). At taper 0
   // the mean equals the top equals the bottom, so the collider is exactly the
   // Phase 1 box.
   const widthTopY = params.torsoWidthRatio * H;

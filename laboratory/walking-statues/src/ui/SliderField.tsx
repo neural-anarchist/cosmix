@@ -1,5 +1,7 @@
+import type { ReactNode } from "react";
+
 interface SliderFieldProps {
-  label: string;
+  label: ReactNode;
   value: number;
   min: number;
   max: number;

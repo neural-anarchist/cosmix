@@ -21,41 +21,41 @@ export interface ComparisonPreset {
 export const COMPARISON_PRESETS: readonly ComparisonPreset[] = [
   {
     id: "rawGeometry",
-    label: "Raw Geometry",
+    label: "No matching (raw shapes)",
     summary:
-      "No normalization. Each family carries the mass, COM and inertia its own shape and densities imply.",
-    leavesFree: "Everything. This is not a controlled performance comparison."
+      "No quantities are held equal. Each shape carries the mass, center of mass and inertia its own volume and densities imply.",
+    leavesFree: "Everything — not a controlled comparison."
   },
   {
     id: "matchedEnvelope",
-    label: "Matched Envelope",
-    summary: "Holds the bounding dimensions and the whole environment fixed; lets mass and COM follow the shape.",
-    leavesFree: "Total mass, base mass, COM, inertia."
+    label: "Match: overall size",
+    summary: "Holds the bounding dimensions and the whole environment fixed; lets mass and the center of mass follow the shape.",
+    leavesFree: "Total mass, base mass, center of mass, rotational inertia."
   },
   {
     id: "matchedMassCom",
-    label: "Matched Mass + COM",
-    summary: "Holds total mass and centre of mass fixed; lets each family keep its own footprint dimensions.",
-    leavesFree: "Maximum width, fore-aft length, base height, base volume, inertia."
+    label: "Match: mass & balance point",
+    summary: "Holds total mass and center of mass fixed; lets each shape keep its own footprint dimensions.",
+    leavesFree: "Maximum width, fore-aft length, base height, base volume, rotational inertia."
   },
   {
     id: "matchedMassComWidth",
-    label: "Matched Mass + COM + Width",
-    summary: "Adds maximum lateral width to the mass and COM locks, so no family gains lateral stability by being wider.",
-    leavesFree: "Fore-aft length, base height, base volume, inertia."
+    label: "Match: mass, balance point & width",
+    summary: "Adds maximum lateral width to the mass and balance-point locks, so no shape gains lateral stability just by being wider.",
+    leavesFree: "Fore-aft length, base height, base volume, rotational inertia."
   },
   {
     id: "matchedVolumeWidth",
-    label: "Matched Volume + Width",
+    label: "Match: base material & width",
     summary: "Holds the base's material volume and its lateral width fixed, letting fore-aft length absorb the difference.",
-    leavesFree: "Total mass, COM, fore-aft length, inertia."
+    leavesFree: "Total mass, center of mass, fore-aft length, rotational inertia."
   },
   {
     id: "matchedMoaiTrial",
-    label: "Matched Moai Candidate Trial",
+    label: "Match: strictest (shape only)",
     summary:
-      "The strictest preset and the one candidate comparisons should use: mass, COM, both plan dimensions, the full environment and the initial pose are all held fixed, leaving shape as the only variable.",
-    leavesFree: "Base height, base volume, inertia — all consequences of the shape being compared."
+      "The strictest preset, meant for comparing shapes directly: mass, center of mass, both plan dimensions, the full environment and the starting pose are all held fixed, leaving shape as the only variable.",
+    leavesFree: "Base height, base volume, rotational inertia — all consequences of the shape being compared."
   }
 ];
 

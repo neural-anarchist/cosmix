@@ -1,7 +1,7 @@
 import { BaselineNotice } from "./ui/BaselineNotice";
-import { BenchmarkPanel } from "./ui/BenchmarkPanel";
 import { ComparisonPanel } from "./ui/ComparisonPanel";
 import { ControlPanel } from "./ui/ControlPanel";
+import { DeveloperTools } from "./ui/DeveloperTools";
 import { DiagnosticsPanel } from "./ui/DiagnosticsPanel";
 import { ReadoutPanel } from "./ui/ReadoutPanel";
 import { RopeControls } from "./ui/RopeControls";
@@ -40,11 +40,12 @@ export function App() {
           <p className="section-kicker">Section one</p>
           <h2>The Statue</h2>
           <p className="section-lede">
-            Rapier steps a fixed-primitive compound rigid body at 1/240 s,
-            decoupled from the render frame rate. Hold a rope button to haul on
-            one rope at the tension set below: below the statue's sliding and
-            tipping thresholds it must not budge, and above them it rocks. Both
-            thresholds are predicted, displayed, and checked by the benchmarks.
+            The physics engine steps a compound rigid body at a fixed 1/240 s,
+            independent of how fast your screen refreshes. Hold a rope button
+            to haul on one side at the tension set below: below the statue's
+            sliding and tipping thresholds it must not budge, and above them
+            it rocks. Both thresholds are predicted and shown in "Physics
+            details" below the readouts.
           </p>
         </div>
 
@@ -54,12 +55,12 @@ export function App() {
         <DiagnosticsPanel />
         <div className="controls">
           <RopeControls />
-          <BenchmarkPanel />
         </div>
+        <ControlPanel />
         <div className="controls">
           <ComparisonPanel />
         </div>
-        <ControlPanel />
+        <DeveloperTools />
       </section>
 
       <section className="section" id="section-theory">
@@ -67,9 +68,8 @@ export function App() {
           <p className="section-kicker">Section two</p>
           <h2>Rocking Geometry &amp; Theory</h2>
           <p className="section-lede">
-            From Newton-Euler rigid-body dynamics to the two Phase 1 base
-            families' very different stability conditions, with a live
-            diagram driven by the statue above.
+            From Newton-Euler rigid-body dynamics to the flat-base and rocker
+            stability conditions, with a live diagram driven by the statue above.
           </p>
         </div>
 
@@ -79,8 +79,10 @@ export function App() {
       <footer className="page-footer">
         <p>
           Cosmix Laboratory · Vite + React + TypeScript, Three.js rendering,
-          Rapier3D (WASM) rigid-body physics. Phase 1 of 5 — see PLAN.md and
-          PHYSICS_MODEL.md for what is and isn't implemented yet.
+          Rapier3D (WASM) rigid-body physics. This is a simplified rigid-body
+          simulation with assumed geometry, friction, rope tension, and a
+          flat rigid ground — not a historically validated demonstration of
+          Moai transport, and not proof that Moai were walked this way.
         </p>
       </footer>
     </div>

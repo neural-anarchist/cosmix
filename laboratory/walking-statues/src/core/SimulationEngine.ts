@@ -534,7 +534,7 @@ export class SimulationEngine {
    * Both come from the same `RopeSolution` the physics consumed, so the picture
    * cannot disagree with the forces — the Phase 1 visual fabricated its own
    * unrelated ground anchor and drew the rope at one angle while the solver
-   * pulled at another (PHASE1_FORCE_CONTACT_AUDIT.md §7.2).
+   * pulled at another (docs/decisions/ADR-002-single-rope-geometry.md).
    */
   private updateRopeVisuals(): void {
     if (!this.statue || !this.ropeLines || !this.ropeArrows || !this.anchorMarkers) return;

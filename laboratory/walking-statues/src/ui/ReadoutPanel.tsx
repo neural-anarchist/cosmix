@@ -1,4 +1,6 @@
+import type { ReactNode } from "react";
 import { useSimStore } from "../state/store";
+import { Katex } from "./math/Katex";
 
 const STATUS_LABEL: Record<string, string> = {
   gray: "Not started",
@@ -17,8 +19,8 @@ export function ReadoutPanel() {
   return (
     <div className="readout-grid">
       <Tile label="Sim time" value={readout ? readout.simTimeS.toFixed(2) : "0.00"} unit="s" />
-      <Tile label="Δx (forward)" value={readout ? readout.dxM.toFixed(4) : "0.0000"} unit="m" />
-      <Tile label="Δy (lateral)" value={readout ? readout.dyM.toFixed(4) : "0.0000"} unit="m" />
+      <Tile label={<><Katex tex="\Delta x" srLabel="delta x" /> (forward)</>} value={readout ? readout.dxM.toFixed(4) : "0.0000"} unit="m" />
+      <Tile label={<><Katex tex="\Delta y" srLabel="delta y" /> (lateral)</>} value={readout ? readout.dyM.toFixed(4) : "0.0000"} unit="m" />
       <Tile label="Roll" value={readout ? readout.rollDeg.toFixed(2) : "0.00"} unit="deg" />
       <Tile label="Pitch" value={readout ? readout.pitchDeg.toFixed(2) : "0.00"} unit="deg" />
       <Tile label="Regime" value={readout?.regime ?? "—"} unit="" />
@@ -38,7 +40,7 @@ export function ReadoutPanel() {
   );
 }
 
-function Tile({ label, value, unit }: { label: string; value: string; unit: string }) {
+function Tile({ label, value, unit }: { label: ReactNode; value: string; unit: string }) {
   return (
     <div className="readout-tile">
       <span className="label">{label}</span>

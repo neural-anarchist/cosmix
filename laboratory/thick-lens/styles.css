@@ -1,8 +1,4 @@
-/* ============================================================
-   BOTTLE LENS LABORATORY
-   Self-contained stylesheet — carries its own copy of the Cosmix
-   palette so the page works when opened directly from disk.
-   ============================================================ */
+/* Bottle Lens Laboratory — self-contained stylesheet (own copy of the Cosmix palette). */
 
 :root {
   --space: #070b14;
@@ -242,7 +238,7 @@ canvas {
 .metrics {
   display: grid;
   gap: 0.75rem;
-  grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(10.5rem, 100%), 1fr));
   margin-bottom: 1.25rem;
 }
 
@@ -290,8 +286,38 @@ canvas {
 .metric-status[data-level="2"] { color: var(--gold); }
 .metric-status[data-level="3"] { color: var(--rust); }
 
-/* ---------- Validation ---------- */
-/* An author-level display value beats the `hidden` attribute, so restore it. */
+/* Primary outputs carry the weight; secondary diagnostics stay quiet. */
+.metrics--primary {
+  grid-template-columns: repeat(auto-fit, minmax(min(12.5rem, 100%), 1fr));
+}
+
+.metrics--primary .metric {
+  border-top: 2px solid var(--line);
+}
+
+.metrics--primary .metric-value {
+  font-size: 1.3rem;
+}
+
+.metrics--primary .metric-hot {
+  border-top-color: var(--rust);
+}
+
+.metrics--secondary {
+  grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
+}
+
+.metrics--secondary .metric {
+  background: transparent;
+  border-style: dashed;
+}
+
+.metrics--secondary .metric-value {
+  font-size: 0.95rem;
+}
+
+/* ---------- Validation notice ---------- */
+/* display:flex would override [hidden]; restore it. */
 .validation[hidden] {
   display: none;
 }
@@ -350,22 +376,37 @@ canvas {
 }
 
 .preset-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: center;
   margin-bottom: 1.5rem;
   padding-bottom: 1.25rem;
   border-bottom: 1px solid var(--line);
 }
 
+.preset-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.9rem;
+  align-items: baseline;
+  margin-bottom: 0.7rem;
+}
+
 .preset-label {
-  margin-right: 0.3rem;
-  color: var(--muted);
-  font-size: 0.64rem;
+  color: var(--ink);
+  font-size: 0.66rem;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+.preset-help {
+  color: rgb(244 239 229 / 45%);
+  font-size: 0.74rem;
+}
+
+.preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
 }
 
 .preset-spacer {
@@ -402,7 +443,7 @@ canvas {
 .controls {
   display: grid;
   gap: 1rem;
-  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(17rem, 100%), 1fr));
   margin-bottom: 1.5rem;
 }
 
@@ -547,44 +588,38 @@ select {
   line-height: 1.55;
 }
 
-/* The less-commonly-touched sliders and toggles in each control card live
-   behind this disclosure, closed by default — the essential parameters above
-   it are what a first visit actually needs, and everything else stays one
-   click away rather than crowding the initial view. */
+/* Advanced controls sit behind a disclosure inside each card. */
 .control-advanced {
   margin-top: 1.1rem;
   padding-top: 1rem;
   border-top: 1px dashed var(--line);
 }
 
-.control-advanced summary {
-  color: var(--muted);
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  cursor: pointer;
-}
-
-.control-advanced summary:hover {
-  color: var(--ink);
-}
-
-.control-advanced[open] summary {
+.control-advanced[open] > summary {
   margin-bottom: 0.9rem;
   color: var(--ink);
 }
 
-.control-advanced .field:first-of-type {
-  margin-top: 0;
+.field-spaced {
+  margin-top: 0.9rem;
+}
+
+.try-note {
+  max-width: 46rem;
+  margin: 0 0 1.5rem;
+  padding: 0.75rem 1rem;
+  color: var(--muted);
+  background: rgb(131 184 215 / 8%);
+  border-left: 2px solid var(--blue);
+  font-size: 0.82rem;
+}
+
+.try-note strong {
+  color: var(--ink);
+  font-weight: 500;
 }
 
 /* ---------- Panels ---------- */
-.panel-grid {
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
-}
-
 .panel {
   padding: 1.2rem;
   background: var(--panel);
@@ -646,15 +681,123 @@ select {
   font-weight: 500;
 }
 
-/* Assumptions drawer */
-.drawer summary {
+/* Disclosures: a summary that reads as an expandable control. */
+.drawer > summary,
+.theory-item > summary,
+.derivation > summary {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
   color: var(--blue);
   font-size: 0.78rem;
   cursor: pointer;
+  list-style: none;
 }
 
-.drawer summary:hover {
+.drawer > summary::-webkit-details-marker,
+.theory-item > summary::-webkit-details-marker,
+.derivation > summary::-webkit-details-marker {
+  display: none;
+}
+
+.drawer > summary::before,
+.theory-item > summary::before,
+.derivation > summary::before {
+  content: "▸";
+  flex: 0 0 auto;
+  font-size: 0.7rem;
+  transition: transform 160ms ease;
+}
+
+.drawer[open] > summary::before,
+.theory-item[open] > summary::before,
+.derivation[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.drawer > summary:hover,
+.theory-item > summary:hover,
+.derivation > summary:hover {
   color: var(--ink);
+}
+
+.drawer > summary:focus-visible,
+.theory-item > summary:focus-visible,
+.derivation > summary:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.control-advanced > summary {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.inline-drawer {
+  margin: -0.1rem 0 0.9rem;
+}
+
+.inline-drawer .hint {
+  margin-top: 0.5rem;
+}
+
+.summary-count {
+  color: rgb(244 239 229 / 45%);
+  font-family: var(--mono);
+  font-size: 0.68rem;
+}
+
+.summary-count[data-flagged="true"] {
+  color: var(--gold);
+}
+
+.disclosure {
+  margin-bottom: 1.25rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+}
+
+.disclosure[open] > summary {
+  margin-bottom: 0.9rem;
+}
+
+.section-quiet {
+  padding-block: 2rem;
+}
+
+.section-quiet .disclosure {
+  margin-bottom: 0;
+}
+
+.limits-list {
+  margin: 0 0 1rem;
+  padding-left: 1.1rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.limits-list li {
+  margin-bottom: 0.25rem;
+}
+
+.limits-list strong {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.plot-info {
+  margin-top: 0.7rem;
+}
+
+.plot-info p {
+  margin: 0.5rem 0 0;
+  color: rgb(244 239 229 / 45%);
+  font-size: 0.73rem;
+  line-height: 1.5;
 }
 
 .assumption-list {
@@ -677,7 +820,7 @@ select {
 .plot-grid {
   display: grid;
   gap: 1rem;
-  grid-template-columns: repeat(auto-fit, minmax(24rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(24rem, 100%), 1fr));
   margin-bottom: 1.5rem;
 }
 
@@ -771,8 +914,7 @@ select {
   min-width: 0;
 }
 
-/* The percentage must never break across lines — a wrapped "91.8 %" reads as
-   two separate numbers. */
+/* Keep the percentage on one line. */
 .fate-legend b {
   flex: 0 0 auto;
   padding-left: 0.5rem;
@@ -843,26 +985,43 @@ select {
   font-style: italic;
 }
 
-.prose-head {
-  margin: 2.4rem 0 0.9rem;
+.theory {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.theory-item {
+  padding: 1rem 1.2rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+}
+
+.theory-item > summary {
   color: var(--gold);
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   font-weight: 600;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
-.prose-head:first-child {
-  margin-top: 0;
+.theory-item[open] > summary {
+  margin-bottom: 1rem;
 }
 
-/* Equations are real LaTeX, rendered by KaTeX (see main.js renderMath()).
-   `.katex-display` is KaTeX's own wrapper for a $$...$$ block; overriding it
-   to `display: table; width: auto` makes the box shrink-wrap to exactly the
-   width of the formula inside — never wider, never a scrollbar for anything
-   that actually fits — while `max-width: 100%` stops it from overflowing a
-   narrow viewport. This is intentionally allowed to break the prose reading
-   measure below, which is tuned for paragraphs, not algebra. */
+.derivation {
+  margin-top: 1.1rem;
+  padding-top: 0.9rem;
+  border-top: 1px dashed var(--line);
+}
+
+.derivation[open] > summary {
+  margin-bottom: 0.9rem;
+}
+
+/* Equations (KaTeX). Display blocks shrink-wrap to the formula and may exceed
+   the prose measure; max-width keeps them inside narrow viewports. */
 .katex { font-size: 1.05em; }
 
 .katex-display {
@@ -891,9 +1050,12 @@ select {
 
 .callout .katex { font-size: 1em; }
 
-/* If the KaTeX CDN is unreachable, the raw $...$/$$...$$ source stays in the
-   text — legible for anyone who reads LaTeX, and never a blank or broken page. */
+/* KaTeX unavailable: the raw LaTeX source stays readable. */
 .katex-missing .prose { font-family: var(--mono); font-size: 0.86rem; }
+
+.prose p {
+  line-height: 1.7;
+}
 
 /* ---------- Developer validation ---------- */
 .dev-summary {
@@ -912,8 +1074,7 @@ select {
   border-left-color: var(--rust);
 }
 
-/* Very narrow viewports: let the longest formulas scroll in place rather
-   than pushing the whole page sideways. */
+/* Narrow viewports: long formulas scroll in place instead of widening the page. */
 @media (max-width: 640px) {
   .katex-display {
     display: block;
@@ -927,7 +1088,7 @@ select {
 .question-grid {
   display: grid;
   gap: 1rem;
-  grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(19rem, 100%), 1fr));
 }
 
 .question-card {
@@ -999,5 +1160,17 @@ select {
 
   .drag-hint {
     margin-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
   }
 }

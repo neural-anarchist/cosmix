@@ -17,7 +17,7 @@ import type { SharedBaseParameterId } from "./shared";
  * - "rocker": a curved bottom touching along a line. There is no finite
  *   tipping lever arm (`contactHalfWidthY` is 0) and no static tipping
  *   threshold — stability is a rolling-equilibrium question instead (see
- *   PHYSICS_MODEL.md).
+ *   MODEL_SCOPE.md).
  */
 export type BaseContactKind = "flat" | "rocker";
 

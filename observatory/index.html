@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="The Cosmix Observatory — write-ups on physics models and derivations, one entry at a time." />
+  <meta name="theme-color" content="#070b14" />
+  <title>The Observatory — Cosmix</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- Entries are markdown, rendered client-side. Without the network,
+       raw markdown/LaTeX stays readable rather than breaking the page
+       (see .katex-missing in subpages.css and the try/catch in
+       observatory.js's per-entry fetch). -->
+  <script defer src="https://cdn.jsdelivr.net/npm/marked@12.0.0/lib/marked.umd.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous" />
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+
+  <link rel="stylesheet" href="../assets/css/style.css" />
+  <link rel="stylesheet" href="../assets/css/lab.css" />
+  <link rel="stylesheet" href="../assets/css/subpages.css" />
+  <script type="module" src="../src/observatory.js"></script>
+</head>
+
+<body class="lab-page">
+  <a class="skip-link" href="#observatory-main">Skip to entries</a>
+
+  <header class="lab-header">
+    <a href="../" class="back-link">← Back to Cosmix</a>
+    <p class="lab-eyebrow">First orbit · Models</p>
+    <h1>The Observatory</h1>
+    <p class="lab-subtitle">
+      Cosmix's model library.
+    </p>
+  </header>
+
+  <main id="observatory-main" class="subpage-main">
+    <ul id="entry-list" class="entry-list"></ul>
+
+    <article id="entry-article" class="entry-article" hidden>
+      <a href="#" id="entry-back" class="entry-back">← All entries</a>
+      <p id="entry-article-meta" class="entry-article-meta"></p>
+      <h2 id="entry-article-title" class="entry-article-title"></h2>
+      <div id="entry-article-body" class="prose"></div>
+    </article>
+  </main>
+</body>
+</html>

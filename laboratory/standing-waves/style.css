@@ -752,8 +752,10 @@ input[type="range"]::-moz-range-thumb {
 
 .prose p {
   max-width: 46rem;
+  margin: 0 0 1.15rem;
   color: var(--muted);
   font-size: 0.9rem;
+  line-height: 1.7;
 }
 
 .prose strong {
@@ -818,6 +820,12 @@ input[type="range"]::-moz-range-thumb {
   background: rgb(155 107 255 / 8%);
   border-left: 2px solid var(--violet);
   font-size: 0.85rem !important;
+}
+
+/* Beats `.prose p` so the boxes keep their own spacing. */
+.prose p.callout,
+.prose p.caveat {
+  margin: 1.4rem 0 1.15rem;
 }
 
 .callout .katex,

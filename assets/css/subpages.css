@@ -1,0 +1,384 @@
+/* ============================================================
+   COSMIX SUB-PAGES
+   Shared styles for the Observatory, Trials and Frontier pages:
+   the Observatory entry list, exam cards, and outbound resource
+   list. Builds on style.css tokens and lab.css's header/back-link,
+   so this file only adds what those two don't already cover.
+   ============================================================ */
+
+.subpage-main {
+  max-width: 54rem;
+  margin: 0 auto;
+  padding: 0 2rem 6rem;
+}
+
+.subpage-section {
+  margin-top: 4rem;
+  scroll-margin-top: 2rem;
+}
+
+.subpage-section:first-child {
+  margin-top: 2.5rem;
+}
+
+.section-title {
+  margin: 0 0 0.5rem;
+  font-family: var(--serif);
+  font-size: 1.7rem;
+  font-weight: 400;
+}
+
+.subpage-section-lede {
+  margin: 0 0 1.75rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+/* ---------- Observatory: entry list ---------- */
+.entry-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 2.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.entry-list-empty {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+.entry-card {
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: rgb(17 26 44 / 45%);
+  transition: border-color 180ms ease;
+}
+
+.entry-card:hover,
+.entry-card:focus-within {
+  border-color: var(--gold);
+}
+
+.entry-card-link {
+  display: block;
+  padding: 1.3rem 1.4rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.entry-card-meta {
+  display: block;
+  color: var(--blue);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-family: var(--mono);
+}
+
+.entry-card-title {
+  margin: 0.5rem 0 0.4rem;
+  font-family: var(--serif);
+  font-size: 1.35rem;
+  font-weight: 400;
+}
+
+.entry-card:hover .entry-card-title,
+.entry-card:focus-within .entry-card-title {
+  color: var(--gold);
+}
+
+.entry-card-summary {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+/* ---------- Observatory: article view ---------- */
+.entry-article {
+  margin-top: 2.5rem;
+}
+
+.entry-back {
+  display: inline-block;
+  margin-bottom: 1.5rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-decoration: none;
+  transition: color 180ms ease;
+}
+
+.entry-back:hover,
+.entry-back:focus-visible {
+  color: var(--gold);
+}
+
+.entry-article-meta {
+  margin: 0;
+  color: var(--blue);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-family: var(--mono);
+}
+
+.entry-article-title {
+  margin: 0.5rem 0 2rem;
+  font-family: var(--serif);
+  font-size: clamp(1.8rem, 4vw, 2.4rem);
+  font-weight: 400;
+  line-height: 1.15;
+}
+
+/* ---------- Prose: the rendered markdown body ---------- */
+.prose {
+  max-width: 42rem;
+}
+
+.prose h2 {
+  margin: 2.5rem 0 1rem;
+  font-family: var(--serif);
+  font-size: 1.4rem;
+  font-weight: 400;
+}
+
+.prose h2:first-child {
+  margin-top: 0;
+}
+
+.prose h3 {
+  margin: 1.75rem 0 0.75rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.prose p {
+  margin: 0 0 1.1rem;
+  color: var(--muted);
+  font-size: 0.94rem;
+  line-height: 1.75;
+}
+
+.prose > p:first-child {
+  color: var(--ink);
+}
+
+.prose strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.prose em {
+  color: var(--ink);
+  font-style: italic;
+}
+
+.prose a {
+  color: var(--gold);
+  text-decoration: underline;
+  text-decoration-color: rgb(215 180 112 / 40%);
+  text-underline-offset: 0.15em;
+  transition: color 180ms ease, text-decoration-color 180ms ease;
+}
+
+.prose a:hover,
+.prose a:focus-visible {
+  color: var(--ink);
+  text-decoration-color: currentColor;
+}
+
+.prose ul,
+.prose ol {
+  margin: 0 0 1.1rem;
+  padding-left: 1.3rem;
+  color: var(--muted);
+  font-size: 0.94rem;
+  line-height: 1.7;
+}
+
+.prose blockquote {
+  margin: 0 0 1.1rem;
+  padding-left: 1rem;
+  border-left: 2px solid var(--line);
+  color: var(--muted);
+  font-style: italic;
+}
+
+.prose code {
+  padding: 0.1rem 0.35rem;
+  border-radius: 2px;
+  background: rgb(255 255 255 / 6%);
+  font-family: var(--mono);
+  font-size: 0.85em;
+}
+
+/* Figures are dark-native (see GRAPHICS_STYLE.md) and share the page's
+   own --space background, so they need only a hairline frame to read
+   as a distinct panel — not a light card. */
+.prose img {
+  display: block;
+  width: 100%;
+  margin: 1.5rem 0 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+}
+
+/* A caption is a standalone paragraph containing only italic text —
+   the convention the entries are written to (see the template). */
+.prose p:has(> em:only-child) {
+  margin: 0 0 1.75rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.prose p:has(> em:only-child) em {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.katex-missing .prose {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+}
+
+.prose-raw {
+  max-width: 42rem;
+  padding: 1rem;
+  overflow-x: auto;
+  color: var(--muted);
+  background: rgb(255 255 255 / 4%);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+/* ---------- Trials: exam cards ---------- */
+.exam-grid {
+  display: grid;
+  gap: 1.1rem;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+}
+
+.exam-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1.3rem 1.4rem;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: rgb(17 26 44 / 45%);
+}
+
+.exam-type {
+  margin: 0;
+  color: var(--blue);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-family: var(--mono);
+}
+
+.exam-title {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 1.2rem;
+  font-weight: 400;
+}
+
+.exam-meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.exam-release {
+  margin: 0.4rem 0 0;
+  color: var(--gold);
+  font-size: 0.78rem;
+  font-style: italic;
+}
+
+.exam-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+}
+
+.exam-btn {
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  color: var(--ink);
+  font-size: 0.78rem;
+  text-decoration: none;
+  transition: border-color 180ms ease, color 180ms ease;
+}
+
+.exam-btn:hover,
+.exam-btn:focus-visible {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.exam-btn.is-disabled {
+  color: var(--muted);
+  cursor: default;
+  opacity: 0.6;
+}
+
+.exam-btn.is-disabled:hover {
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+/* ---------- Frontier: resource list ---------- */
+/* One line per entry: "bolded, linked title: description". Plain
+   <li>s rather than cards, since an entry is a sentence, not a tile. */
+.resource-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin: 2.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.resource-item {
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+
+.resource-item strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.resource-item a {
+  color: var(--gold);
+  text-decoration: underline;
+  text-decoration-color: rgb(215 180 112 / 40%);
+  text-underline-offset: 0.15em;
+  transition: color 180ms ease, text-decoration-color 180ms ease;
+}
+
+.resource-item a:hover,
+.resource-item a:focus-visible {
+  color: var(--ink);
+  text-decoration-color: currentColor;
+}
+
+@media (max-width: 640px) {
+  .subpage-main {
+    padding: 0 1.25rem 4rem;
+  }
+}

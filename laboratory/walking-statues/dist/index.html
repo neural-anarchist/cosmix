@@ -14,16 +14,13 @@
     rel="stylesheet"
   />
 
-  <!-- KaTeX renders the mathematics in the theory section. Loaded from a CDN,
-       so it needs a network connection; if it fails the raw TeX source is
-       still legible rather than the page breaking. Placed before the app's
-       module script so window.renderMathInElement exists by mount time. -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous" />
-  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" crossorigin="anonymous"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+  <!-- Mathematics is rendered with KaTeX, bundled as a dependency (see
+       src/ui/math/Katex.tsx) rather than loaded from a CDN, so it renders the
+       same way offline as online and stays in sync with frequently-updating
+       readouts. -->
 
-  <script type="module" crossorigin src="./assets/index-CLDOqd2t.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-BMXmKR3U.css">
+  <script type="module" crossorigin src="./assets/index-DFLD8kAf.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-C6Ofc6jC.css">
 </head>
 <body>
   <div id="root"></div>

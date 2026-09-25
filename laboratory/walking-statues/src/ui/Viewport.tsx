@@ -204,8 +204,8 @@ export function Viewport() {
           </label>
           <p className="hint">
             Drag to orbit, scroll to zoom. The collider overlay shows the actual
-            simulated shapes — a small number of primitives, deliberately coarser
-            than the display mesh (see PHYSICS_MODEL.md).
+            shapes the physics engine sees — a small number of simple solids,
+            deliberately coarser than the detailed statue you see rendered.
           </p>
         </div>
       </div>

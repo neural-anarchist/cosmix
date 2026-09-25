@@ -1,6 +1,7 @@
 import { useSimStore } from "../../state/store";
 import { HEAD_HEIGHT_RATIO } from "../../statue/constants";
 import { computeStatueGeometry } from "../../statue/geometry";
+import { Katex } from "../math/Katex";
 
 const VIEW_W = 320;
 const VIEW_H = 240;
@@ -120,19 +121,22 @@ export function RockingDiagram() {
       </svg>
       {isRocker ? (
         <p className="diagram-note">
-          {statueParams.baseFamily} is a rolling rocker, not an edge-tipping
-          base: there is no fixed critical angle. Stability instead depends on
-          whether the COM (gold dot) stays over the rolling contact patch as the
-          body rocks — qualitative, not a single threshold. See Theory §5.
+          This shape rolls on a curve rather than tipping about an edge: there
+          is no fixed critical angle. Stability instead depends on whether the
+          center of mass (gold dot) stays over the rolling contact point as
+          the body rocks — a qualitative condition, not a single threshold
+          (see Theory §5, "Rocking/rolling stability").
         </p>
       ) : (
         <p className="diagram-note">
-          Dashed rust lines mark ±θ_crit ≈ {critAngleDeg?.toFixed(1)}° — the flat
-          base's static tipping angle at the current COM height ({comHeightM.toFixed(2)} m),
-          using the governing (smaller) tipping arm b = {halfWidthM.toFixed(3)} m.
-          Past this roll, the weight vector (gold, dashed) falls outside the base
-          footprint and gravity's torque flips from restoring to overturning. See
-          Theory §4.
+          Dashed rust lines mark <Katex tex="\pm\theta_{\text{crit}} \approx" srLabel="plus or minus the critical tipping angle" />{" "}
+          {critAngleDeg?.toFixed(1)}° — the flat base's static tipping angle at
+          the current center-of-mass height ({comHeightM.toFixed(2)} m), using
+          the smaller of the two tipping arms,{" "}
+          <Katex tex="b" srLabel="b" /> = {halfWidthM.toFixed(3)} m. Past this
+          roll, the weight vector (gold, dashed) falls outside the base
+          footprint and gravity's torque flips from restoring to overturning
+          (see Theory §4, "Static tipping condition").
         </p>
       )}
     </div>

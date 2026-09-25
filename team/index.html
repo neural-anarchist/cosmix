@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#07111f" />
-  <title>Meet the Team — Cosmix</title>
+  <title>About Us — Cosmix</title>
   <link rel="stylesheet" href="../assets/css/style.css" />
   <link rel="stylesheet" href="../assets/css/team.css" />
 </head>
@@ -12,13 +12,38 @@
 
   <header class="team-header">
     <a href="../" class="back-link">← Back to Cosmix</a>
-    <h1>Meet the Team</h1>
-    <p class="team-subtitle">
-      The builders behind Cosmix's academy, exams, and simulations.
-    </p>
+    <h1>About Us</h1>
+    <nav class="about-nav" aria-label="About sections">
+      <a href="#about">About Cosmix</a>
+      <a href="#team">Meet the Team</a>
+      <a href="#club">Lexington Physics Club</a>
+      <a href="#partners">Partners</a>
+    </nav>
   </header>
 
-  <main id="team-grid" class="team-grid"></main>
+  <main class="about-main">
+    <section id="about" class="about-section">
+      <h2 class="section-title">About Cosmix</h2>
+      <div id="about-text" class="about-text"></div>
+    </section>
+
+    <section id="team" class="about-section">
+      <h2 class="section-title">Meet the Team</h2>
+      <p class="team-subtitle">The builders of Cosmix.</p>
+      <div id="team-grid" class="team-grid"></div>
+    </section>
+
+    <section id="club" class="about-section">
+      <h2 class="section-title">Lexington Physics Club</h2>
+      <p class="team-subtitle">Upcoming meetings and events.</p>
+      <ol id="club-schedule" class="schedule" tabindex="0" aria-label="Club schedule, scrollable"></ol>
+    </section>
+
+    <section id="partners" class="about-section">
+      <h2 class="section-title">Partners</h2>
+      <div id="partner-grid" class="team-grid partner-grid"></div>
+    </section>
+  </main>
 
   <script type="module" src="../src/team.js"></script>
 </body>

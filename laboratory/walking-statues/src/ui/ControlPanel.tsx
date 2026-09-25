@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
   ALL_BASE_FAMILY_IDS,
   foreAftMirrorFamily,
@@ -7,6 +8,7 @@ import {
 import { SHARED_BASE_PARAM_RANGES, type SharedBaseParameterId } from "../statue/bases/shared";
 import { useSimStore } from "../state/store";
 import type { BaseFamilyId, StatueParams, VisualDetail } from "../statue/types";
+import { Katex } from "./math/Katex";
 import { SliderField } from "./SliderField";
 
 /**
@@ -18,39 +20,64 @@ import { SliderField } from "./SliderField";
  */
 const BASE_PARAM_FIELDS: {
   id: SharedBaseParameterId;
-  label: string;
+  label: ReactNode;
   step: number;
   title: string;
 }[] = [
-  { id: "baseWidthRatio", label: "Base width W/H", step: 0.01, title: "W_base / H — maximum lateral extent." },
-  { id: "baseLengthRatio", label: "Base length L/H", step: 0.01, title: "L_base / H — fore-aft extent." },
-  { id: "baseHeightRatio", label: "Base height H_b/H", step: 0.01, title: "H_base / H." },
+  {
+    id: "baseWidthRatio",
+    label: <>Base width <Katex tex="W_{\text{base}}/H" srLabel="base width over height" /></>,
+    step: 0.01,
+    title: "Maximum lateral extent of the base, as a fraction of total height."
+  },
+  {
+    id: "baseLengthRatio",
+    label: <>Base length <Katex tex="L_{\text{base}}/H" srLabel="base length over height" /></>,
+    step: 0.01,
+    title: "Fore-aft extent of the base, as a fraction of total height."
+  },
+  {
+    id: "baseHeightRatio",
+    label: <>Base height <Katex tex="H_{\text{base}}/H" srLabel="base height over total height" /></>,
+    step: 0.01,
+    title: "Height of the base itself, as a fraction of total height."
+  },
   {
     id: "baseLateralRadiusRatio",
-    label: "Lateral curvature R_lat/H",
+    label: <>Lateral curvature <Katex tex="R_{\text{lat}}/H" srLabel="lateral radius over height" /></>,
     step: 0.01,
-    title: "Lateral rolling radius. For A4 and B5 this is defined as W/2 and the control is inactive."
+    title: "Lateral rolling radius. For A4 and B5 this is defined as half the base width and the control is inactive."
   },
   {
     id: "baseForeAftRadiusRatio",
-    label: "Fore-aft curvature R_fore/H",
+    label: <>Fore-aft curvature <Katex tex="R_{\text{fore}}/H" srLabel="fore-aft radius over height" /></>,
     step: 0.01,
     title: "Teardrop tail radius (B2/B3) or fore-aft rolling radius at contact (B5)."
   },
-  { id: "baseEdgeRoundingRatio", label: "Edge rounding r/H", step: 0.005, title: "Plan-corner rounding radius." },
+  {
+    id: "baseEdgeRoundingRatio",
+    label: <>Edge rounding <Katex tex="r/H" srLabel="edge radius over height" /></>,
+    step: 0.005,
+    title: "Plan-corner rounding radius, as a fraction of total height."
+  },
   {
     id: "baseFrontBackAsymmetry",
     label: "Front/back asymmetry",
     step: 0.02,
-    title: "Splits the fore-aft length as (L/2)(1 ± f). Total length is preserved."
+    title: "Splits the fore-aft length unevenly between front and back while preserving the total length."
   },
   {
     id: "baseLeftRightAsymmetry",
     label: "Left/right asymmetry",
     step: 0.02,
-    title: "Splits the lateral width as (W/2)(1 ± a). Maximum width is preserved."
+    title: "Splits the lateral width unevenly between left and right while preserving the maximum width."
   },
-  { id: "baseOffsetXRatio", label: "Base x-offset / H", step: 0.005, title: "Shifts the base fore or aft under the upper body." },
+  {
+    id: "baseOffsetXRatio",
+    label: <>Base x-offset <Katex tex="x_{\text{base}}/H" srLabel="base offset over height" /></>,
+    step: 0.005,
+    title: "Shifts the base forward or backward under the upper body."
+  },
   {
     id: "baseForwardLeanDeg",
     label: "Base mount lean",
@@ -77,7 +104,7 @@ export function ControlPanel() {
       <div className="control-card">
         <h3>Statue &amp; mass</h3>
         <SliderField
-          label="Height H"
+          label={<>Height <Katex tex="H" /></>}
           unit="m"
           value={statueParams.heightM}
           min={1.5}
@@ -87,7 +114,7 @@ export function ControlPanel() {
           title="Total statue height, base to crown."
         />
         <SliderField
-          label="Mass M"
+          label={<>Mass <Katex tex="M" /></>}
           unit="kg"
           precision={0}
           value={statueParams.totalMassKg}
@@ -116,7 +143,7 @@ export function ControlPanel() {
           title="Fraction of total mass carried by the head. Remainder goes to the torso."
         />
         <SliderField
-          label="Shoulder width / H"
+          label={<>Shoulder width <Katex tex="/H" srLabel="over height" /></>}
           value={statueParams.torsoWidthRatio}
           min={0.08}
           max={0.4}
@@ -125,7 +152,7 @@ export function ControlPanel() {
           title="Torso width (y) at the shoulders, the widest point of the upper body."
         />
         <SliderField
-          label="Body depth / H"
+          label={<>Body depth <Katex tex="/H" srLabel="over height" /></>}
           value={statueParams.torsoDepthRatio}
           min={0.08}
           max={0.4}
@@ -140,7 +167,7 @@ export function ControlPanel() {
           max={0.6}
           step={0.01}
           onChange={(v) => setStatueParams({ torsoTaper: v })}
-          title="Fractional narrowing from shoulders down to the torso base. 0 reproduces the Phase 1 uniform box."
+          title="Fractional narrowing from shoulders down to the torso base. 0 reproduces a plain, untapered box."
         />
         <SliderField
           label="Forward lean"
@@ -155,10 +182,11 @@ export function ControlPanel() {
         />
         <p className="hint">
           Taper and lean are <em>mechanical</em> parameters: they move real
-          material, so they change the collider cross-section, the COM and the
-          inertia. Setting both to zero reproduces the validated Phase 1 body
-          exactly. Intrinsic lean pivots the upper body at the top of the base
-          and is reported separately from dynamic pitch in the diagnostics.
+          material, so they change the collider cross-section, the center of
+          mass and the inertia. Setting both to zero gives a plain, upright
+          box — the exact shape the checks below were run against. Intrinsic
+          lean pivots the upper body at the top of the base and is reported
+          separately from dynamic pitch in the physics details.
         </p>
         <div className="reset-row">
           <button className="btn" type="button" onClick={resetStatueParams}>
@@ -171,8 +199,8 @@ export function ControlPanel() {
         <h3>Center of mass</h3>
         <p className="inline-note">
           {statueParams.comOverrideEnabled
-            ? `Overridden — COM forced to (${(statueParams.comOffsetXRatio * statueParams.heightM).toFixed(3)}, ${(statueParams.comOffsetYRatio * statueParams.heightM).toFixed(3)}, ${(statueParams.comHeightRatio * statueParams.heightM).toFixed(3)}) m`
-            : `Derived from geometry — z_COM = ${(readout?.comLocal.z ?? 0).toFixed(3)} m`}
+            ? `Set by hand — center of mass forced to (${(statueParams.comOffsetXRatio * statueParams.heightM).toFixed(3)}, ${(statueParams.comOffsetYRatio * statueParams.heightM).toFixed(3)}, ${(statueParams.comHeightRatio * statueParams.heightM).toFixed(3)}) m`
+            : `Derived from the statue's geometry — height ${(readout?.comLocal.z ?? 0).toFixed(3)} m`}
         </p>
         <label className="field field-checkbox">
           <input
@@ -180,10 +208,10 @@ export function ControlPanel() {
             checked={statueParams.comOverrideEnabled}
             onChange={(e) => setStatueParams({ comOverrideEnabled: e.target.checked })}
           />
-          <span>Override COM explicitly</span>
+          <span>Set the center of mass by hand</span>
         </label>
         <SliderField
-          label="Forward COM offset x/H"
+          label={<>Forward offset <Katex tex="x/H" srLabel="x over height" /></>}
           precision={3}
           value={statueParams.comOffsetXRatio}
           min={-0.15}
@@ -193,7 +221,7 @@ export function ControlPanel() {
           onChange={(v) => setStatueParams({ comOffsetXRatio: v })}
         />
         <SliderField
-          label="Lateral COM offset y/H"
+          label={<>Lateral offset <Katex tex="y/H" srLabel="y over height" /></>}
           precision={3}
           value={statueParams.comOffsetYRatio}
           min={-0.15}
@@ -203,7 +231,7 @@ export function ControlPanel() {
           onChange={(v) => setStatueParams({ comOffsetYRatio: v })}
         />
         <SliderField
-          label="COM height z/H"
+          label={<>Height <Katex tex="z/H" srLabel="z over height" /></>}
           precision={3}
           value={statueParams.comHeightRatio}
           min={0.15}
@@ -213,12 +241,14 @@ export function ControlPanel() {
           onChange={(v) => setStatueParams({ comHeightRatio: v })}
         />
         <p className="hint">
-          An override discards the derived mass properties and places the COM
-          where you ask, for sweeps where COM is the independent variable.
-          Collider shapes are untouched, so contact is unchanged — but the
-          rotational inertia is carried over from the derived body rather than
-          recomputed, so an overridden statue is an <em>abstract probe, not a
-          self-consistent rigid body</em>. The COM marker turns violet to say so.
+          Setting this by hand discards the mass properties derived from the
+          statue's shape and places the center of mass wherever you ask, for
+          testing that one quantity on its own. The collider shapes are
+          untouched, so contact is unchanged — but the rotational inertia is
+          carried over from the derived body rather than recomputed, so the
+          result is <em>not a physically consistent statue</em>, just a
+          simplified test case. The center-of-mass marker turns violet to say
+          so.
         </p>
       </div>
 
@@ -238,31 +268,31 @@ export function ControlPanel() {
           </select>
         </div>
         <p className="hint">
-          Affects triangle counts only. A unit test asserts that mass, COM,
-          inertia and the collider set are byte-identical across all three
-          levels, so the good-looking version and the simulated version can
-          never be different statues.
+          Affects triangle counts only — a display setting, not a physics one.
+          Mass, center of mass, inertia and the collision shapes are checked
+          to stay identical across all three levels, so the good-looking
+          version and the simulated version can never be different statues.
         </p>
       </div>
 
       <div className="control-card">
         <h3>Base geometry</h3>
         <div className="field">
-          <label title="Base family. A-series are symmetric validation shapes; B-series are the fore-aft asymmetric candidates.">
-            <span>Base family</span>
+          <label title="The shape of the statue's base. Symmetric shapes are reference cases; asymmetric shapes are the ones being tested for a forward-walking effect.">
+            <span>Base shape</span>
           </label>
           <select
             value={statueParams.baseFamily}
             onChange={(e) => setStatueParams({ baseFamily: e.target.value as BaseFamilyId })}
           >
-            <optgroup label="A — symmetric (validation / reference)">
+            <optgroup label="Symmetric shapes (reference cases)">
               {ALL_BASE_FAMILY_IDS.filter((id) => SYMMETRIC_BASE_FAMILY_IDS.includes(id)).map((id) => (
                 <option key={id} value={id}>
                   {getBaseModule(id).label}
                 </option>
               ))}
             </optgroup>
-            <optgroup label="B — fore-aft asymmetric (candidates)">
+            <optgroup label="Asymmetric shapes (test cases)">
               {ALL_BASE_FAMILY_IDS.filter((id) => !SYMMETRIC_BASE_FAMILY_IDS.includes(id)).map((id) => (
                 <option key={id} value={id}>
                   {getBaseModule(id).label}
@@ -276,16 +306,19 @@ export function ControlPanel() {
 
         {isSymmetricFamily ? (
           <p className="hint">
-            This is a <strong>symmetric</strong> family. On a flat symmetric road under
-            symmetric forcing it has no mechanism by which to prefer a direction, so it
-            is a validation model, not a walking candidate.
+            This shape is symmetric front-to-back and left-to-right. On a flat,
+            symmetric road under symmetric pulling it has no reason to prefer
+            a direction, so it can rock in place but can't demonstrate
+            directed walking by itself — that's what makes it a useful
+            reference case.
           </p>
         ) : (
           <p className="hint">
-            Fore-aft asymmetric family.{" "}
+            This shape is not symmetric front-to-back, which is the kind of
+            difference a walking mechanism would need.{" "}
             {mirrorFamily
-              ? `Its exact fore-aft mirror control is ${mirrorFamily}.`
-              : "No exact fore-aft mirror exists for this outline in Phase 2 — a mirrored control trial is not available for it."}
+              ? `Its exact front-to-back mirror image is ${mirrorFamily}, useful for a left/right control comparison.`
+              : "No exact mirror image exists for this outline, so a mirrored control comparison isn't available for it."}
           </p>
         )}
 
@@ -308,10 +341,11 @@ export function ControlPanel() {
         })}
 
         <p className="hint">
-          Greyed-out controls are ones this family does not read — the shared schema is
-          the same for every base, but a cylinder has no separate lateral radius and a
-          rectangle has no tail. Whether a parameter is used is declared by the family
-          itself and listed in the diagnostics panel, so nothing is silently ignored.
+          Greyed-out controls are ones this shape does not use — every shape
+          shares the same set of controls, but a cylinder has no separate
+          lateral radius and a rectangle has no tail. Which controls are used
+          is also listed in "Physics details" below, so nothing is silently
+          ignored.
         </p>
       </div>
 
@@ -338,13 +372,13 @@ export function ControlPanel() {
           onChange={(v) => setRoadParams({ widthM: v })}
         />
         <SliderField
-          label="Friction coefficient μ"
+          label={<>Friction coefficient <Katex tex="\mu" srLabel="mu" /></>}
           value={roadParams.frictionCoefficient}
           min={0.05}
           max={1.4}
           step={0.01}
           onChange={(v) => setRoadParams({ frictionCoefficient: v })}
-          title="Applied to every statue/road contact pair (Phase 1: one shared value)."
+          title="One assumed value, applied to every contact between the statue and the road. Higher values favor tipping over sliding."
         />
         <SliderField
           label="Restitution"
@@ -356,7 +390,8 @@ export function ControlPanel() {
           title="Contact bounciness. Keep low for a statue that should settle, not bounce."
         />
         <p className="hint">
-          Flat road only in Phase 1 — concave and rough modes are Phase 3/5 (see PLAN.md).
+          The road is always flat, rigid and level. Slope, unevenness and give
+          in the surface are not modelled.
         </p>
         <div className="reset-row">
           <button className="btn" type="button" onClick={resetRoadParams}>

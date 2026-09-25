@@ -1,5 +1,6 @@
 import type { RopeSide } from "../control/ropeModel";
 import { useSimStore, type Axis } from "../state/store";
+import { Katex } from "./math/Katex";
 import { NumberField } from "./NumberField";
 import { SliderField } from "./SliderField";
 
@@ -28,7 +29,7 @@ export function RopeControls() {
       <h3>Rope geometry &amp; tension</h3>
 
       <SliderField
-        label="Rope tension T"
+        label={<>Rope tension <Katex tex="T" /></>}
         unit="N"
         precision={0}
         value={ropeParams.tensionN}
@@ -39,7 +40,8 @@ export function RopeControls() {
         title="Tension applied along the rope while that side is being hauled."
       />
       <p className="inline-note">
-        T / Mg = {(ropeParams.tensionN / (totalMassKg * 9.81)).toFixed(3)}
+        <Katex tex="T/Mg" srLabel="tension divided by weight" /> ={" "}
+        {(ropeParams.tensionN / (totalMassKg * 9.81)).toFixed(3)}
       </p>
 
       {(["left", "right"] as RopeSide[]).map((side) => {
@@ -49,7 +51,7 @@ export function RopeControls() {
           <div className="rope-group" key={side}>
             <h4>{SIDE_LABEL[side]}</h4>
 
-            <p className="rope-sub">Haulers (world position)</p>
+            <p className="rope-sub">Hauler position (fixed in the world)</p>
             <div className="num-row">
               {AXES.map((axis) => (
                 <NumberField
@@ -82,8 +84,8 @@ export function RopeControls() {
             {diag ? (
               <p className="rope-decomp">
                 <span>
-                  d&#770; = ({diag.direction.x.toFixed(3)}, {diag.direction.y.toFixed(3)},{" "}
-                  {diag.direction.z.toFixed(3)})
+                  <Katex tex="\hat{d}" srLabel="unit direction" /> = ({diag.direction.x.toFixed(3)},{" "}
+                  {diag.direction.y.toFixed(3)}, {diag.direction.z.toFixed(3)})
                 </span>
                 <span>
                   forward {(diag.direction.x * 100).toFixed(0)}% · lateral{" "}

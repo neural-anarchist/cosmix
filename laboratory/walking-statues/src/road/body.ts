@@ -29,7 +29,7 @@ export function createRoadBody(
   if (params.type !== "flat") {
     throw new Error(
       `createRoadBody only supports type "flat"; got "${params.type}". ` +
-        "Concave and rough road modes are not implemented yet (see PLAN.md)."
+        "Concave and rough road modes are not implemented yet (see DEVELOPMENT.md)."
     );
   }
 

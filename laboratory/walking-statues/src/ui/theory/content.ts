@@ -8,12 +8,10 @@ export interface TheorySectionContent {
   paragraphs: TheoryParagraph[];
 }
 
-export const THEORY_INTRO = String.raw`This covers what Phase 1 actually implements: the rigid-body equations of
-motion, the fixed-timestep integration method, and the two base families'
-distinct stability conditions. Rope work/energy accounting, the remaining
-base families, and the alternating pulling protocols (P0-P5) get their own
-theory as they land — see PHYSICS_MODEL.md for the living, canonical list of
-what is simulated versus approximated.`;
+export const THEORY_INTRO = String.raw`This section covers what the simulation actually computes: the rigid-body
+equations of motion, the fixed-timestep integration method, and the flat-base
+and rocker stability conditions. Rope work/energy accounting and alternating
+pulling protocols are not implemented, so there is no theory for them here.`;
 
 export const THEORY_CONTENT: TheorySectionContent[] = [
   {
@@ -22,17 +20,16 @@ export const THEORY_CONTENT: TheorySectionContent[] = [
       {
         text: String.raw`The simulation state is the pose of a single rigid body: the position of
 its reference origin (the base's bottom-center) in world coordinates, plus
-an orientation quaternion. Axes follow the project convention everywhere —
-forward $x$, lateral $y$, vertical $z$ — applied natively in both Rapier
-and Three.js rather than converted at the render boundary (see
-ARCHITECTURE.md, "Coordinate convention").`
+an orientation quaternion. Axes follow one convention everywhere — forward
+$x$, lateral $y$, vertical $z$ — applied natively in both the physics engine
+and the renderer, rather than converted at the boundary between them.`
       },
       {
         text: String.raw`Roll and pitch are read back from that quaternion via an 'XYZ'-ordered
 Euler decomposition: $\text{roll} = \theta_x$, $\text{pitch} = \theta_y$,
 $\text{yaw} = \theta_z$. This is an approximation — any three-angle
 decomposition degenerates near gimbal lock — acceptable here because the
-crude fallen-state threshold (60°, Phase 1's placeholder) is crossed well
+crude fallen-state threshold (60°, a placeholder) is crossed well
 before that regime.`
       }
     ]
@@ -56,13 +53,12 @@ body: translational motion of the center of mass,`
         text: String.raw`$$\mathbf{I}\,\dot{\boldsymbol\omega} + \boldsymbol\omega \times (\mathbf{I}\,\boldsymbol\omega) \;=\; \boldsymbol\tau_{ext}$$`
       },
       {
-        text: String.raw`$M$, $\mathbf{I}$ (about the COM), and the COM location itself are never
-hand-specified: they fall out of the collider shapes and per-collider
-densities assigned in statue/factory.ts from the base/torso/head mass
-fractions, exactly as the "explicit mass distribution, COM, and inertia
-reporting" requirement asks. Read them back from Rapier — via
-worldCom(), mass(), and principalInertia() — in the readouts rather than
-re-deriving them by hand.`
+        text: String.raw`$M$, $\mathbf{I}$ (about the COM) and the COM location itself are never typed
+in: each collider gets a density from the base, torso and head mass fractions
+and its own volume, and the physics engine derives mass, COM and inertia from
+the resulting shapes. The readouts above report those computed values
+directly, so the numbers shown are exactly what the solver is using — not a
+separate hand calculation.`
       }
     ]
   },
@@ -78,15 +74,15 @@ for position, slerp for orientation — so motion reads smoothly even when
 render rate and 240 Hz don't divide evenly.`
       },
       {
-        text: String.raw`Rapier resolves free motion with a semi-implicit ("symplectic") Euler
-step — velocities update from accumulated forces first, positions update
-from the new velocities — and resolves contact and friction as
-velocity-level impulse constraints solved iteratively within the step.
-That is standard practice for real-time rigid-body engines and is not a
-substitute for a validated multibody-dynamics tool. The project's planned
-numerical-credibility checks (comparing this $\Delta t$ against $\Delta t/2$,
-Phase 4) and the eventual MuJoCo-WASM cross-check exist specifically to
-quantify how much this approximation matters for this system.`,
+        text: String.raw`The physics engine resolves free motion with a semi-implicit ("symplectic")
+Euler step — velocities update from the accumulated forces first, positions
+update from the new velocities — and resolves contact and friction as
+velocity-level impulse constraints solved iteratively within the step. That is
+standard practice for real-time rigid-body engines, but it is a numerical
+method with its own approximation error, not a substitute for a validated
+multibody-dynamics tool. Whether halving or quartering the timestep changes
+the results has not yet been checked, so how much this approximation matters
+for this particular setup is not yet quantified.`,
         variant: "caveat"
       }
     ]
@@ -138,10 +134,9 @@ rather than opposing it.`
       },
       {
         text: String.raw`That condition — not a fixed angle — is what actually limits how far a
-rope pull can safely rock this base. Phase 1 leaves A4 as a full 360°
-cylinder (see statue/bases/a4-lateralRocker.ts) precisely so this is the
-only limit in play, rather than a heel/toe facet artificially capping the
-roll — a documented simplification, not a hidden one.`,
+rope pull can safely rock this base. This rocker shape is modelled as a full
+360° cylinder precisely so this is the only limit in play, rather than a
+heel/toe facet artificially capping the roll — a deliberate simplification.`,
         variant: "caveat"
       },
       {
@@ -180,8 +175,8 @@ the line between them,`
 points from the statue toward the haulers, so there is no way to express a
 rope that pushes. It also means the force has genuine lateral, forward and
 vertical components determined by where the haulers actually stand — the
-default arrangement gives roughly $\hat{\mathbf{d}} \approx (0.46, \pm
-0.76, -0.46)$. Both the rendered rope and the force arrow are drawn from
+default arrangement gives roughly $\hat{\mathbf{d}} \approx (0.46, \pm 0.76, -0.46)$.
+Both the rendered rope and the force arrow are drawn from
 this same solution, so the picture cannot disagree with the physics.`
       },
       {
@@ -193,9 +188,9 @@ exerts a torque about the COM of`
       },
       {
         text: String.raw`Pulling one side rolls the statue toward that side; releasing and pulling
-the other reverses it. Manual hold-to-pull control is Phase 1's entire
-pulling model — the scripted alternation (P1), angle-feedback PD control
-(P3), and the rest of the P0-P5 protocol set are Phase 2 (see PLAN.md).`
+the other reverses it. Manual hold-to-pull control is the only pulling model
+implemented — scripted alternation, angle-feedback control and other
+protocols are not built.`
       },
       {
         text: String.raw`Nothing here adds a forward push. A rope may have a forward component, but
@@ -228,11 +223,11 @@ $F\,z_a$ against $Mg\,b$ gives`
       },
       {
         text: String.raw`Whichever is smaller governs. Below $\min(F_{slide}, F_{tip})$ the statue
-must simply stay put, and the "Run static equilibrium benchmark" button
-checks exactly that: it holds 50% of the governing threshold for 5 s and
-requires the statue to move less than 0.5 mm and rotate less than 0.05°.
-The force-ramp button then walks the tension up to 125% and reports the
-first level at which real motion begins, alongside both predictions.`
+must simply stay put. Two checks further down the page, under "Developer &
+verification tools," test exactly that: one holds 50% of the governing
+threshold for 5 s and requires the statue to move less than 0.5 mm and rotate
+less than 0.05°; the other ramps the tension up to 125% and reports the first
+level at which real motion begins, alongside both predictions.`
       },
       {
         text: String.raw`Which threshold governs is what decides the *character* of the failure, and

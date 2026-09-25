@@ -1,8 +1,5 @@
-/* ============================================================
-   MAGNETIC PENDULUM CRADLE
-   Self-contained stylesheet — carries its own copy of the Cosmix
-   palette so the page works when opened directly from disk.
-   ============================================================ */
+/* Magnetic pendulum cradle — self-contained; carries its own copy of the
+   Cosmix palette so the page works when opened directly from disk. */
 
 :root {
   --space: #070b14;
@@ -60,6 +57,23 @@ code {
   color: var(--gold);
 }
 
+a:focus-visible,
+button:focus-visible,
+summary:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 /* ---------- Header ---------- */
 .page-header {
   max-width: 64rem;
@@ -113,7 +127,8 @@ h1 {
   top: 0;
   z-index: 10;
   display: flex;
-  gap: 1.5rem;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.5rem;
   justify-content: center;
   padding: 0.9rem 2rem;
   background: rgb(7 11 20 / 88%);
@@ -194,7 +209,7 @@ canvas {
 
 #spring-canvas {
   aspect-ratio: 21 / 9;
-  max-height: 40vh;
+  max-height: 32vh;
 }
 
 #compare-canvas {
@@ -267,9 +282,8 @@ canvas {
 }
 
 /* ---------- Validation ---------- */
-/* An author-level display value beats the `hidden` attribute, so restore it. */
 .validation[hidden] {
-  display: none;
+  display: none; /* an author display value would otherwise beat `hidden` */
 }
 
 .validation {
@@ -278,23 +292,28 @@ canvas {
   gap: 0.5rem;
   margin: 0 0 1.5rem;
   padding: 0.85rem 1rem;
-  color: var(--gold);
   background: rgb(215 180 112 / 8%);
   border-left: 2px solid var(--gold);
   font-size: 0.8rem;
 }
 
-/* ---------- Mathematics ----------
-   Equation blocks shrink-wrap their contents rather than spanning the column,
-   so each box is exactly as wide as the formula inside it. They are also
-   allowed to break out of the prose measure, which is set for reading prose
-   rather than for matrices — that combination is what keeps every equation
-   scrollbar-free. */
+.msg strong {
+  display: inline-block;
+  margin-right: 0.5rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.msg-physical { color: var(--gold); }
+.msg-linear { color: var(--blue); }
+.msg-numerical { color: var(--rust); }
+
+/* ---------- Mathematics ---------- */
 .katex { font-size: 1em; }
 
 .katex-display {
-  /* Shrink to content, but never exceed the section width. */
-  display: table;
+  display: table; /* shrink to content, never wider than the section */
   width: auto;
   max-width: 100%;
   margin: 1.1rem 0;
@@ -309,8 +328,7 @@ canvas {
   white-space: normal;
 }
 
-/* Last-resort safety valve: if a formula still cannot fit (very narrow
-   viewport), let that one box scroll rather than pushing the page sideways. */
+/* On narrow screens an equation scrolls inside its own box. */
 @media (max-width: 640px) {
   .katex-display {
     display: block;
@@ -320,7 +338,6 @@ canvas {
   .katex { font-size: 0.9em; }
 }
 
-/* If the CDN is unreachable the raw TeX is still readable. */
 .katex-missing .prose { font-family: var(--mono); }
 
 .callout {
@@ -334,19 +351,114 @@ canvas {
 .delta { color: var(--gold); }
 .dim { color: rgb(244 239 229 / 30%); }
 
-/* ---------- Controls ---------- */
-.controls {
+/* ---------- Readouts, presets, segmented control ---------- */
+.readouts {
   display: grid;
-  gap: 1rem;
-  /* 13.5rem lets four cards (global + three pendulums) share one row at the
-     section's max width. */
-  grid-template-columns: repeat(auto-fit, minmax(13.5rem, 1fr));
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(11rem, 100%), 1fr));
+  margin: 1.25rem 0 0.5rem;
 }
 
-.pendulum-controls {
-  display: contents;
+.readout {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+  padding: 0.85rem 1rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-top: 2px solid var(--gold);
+  border-radius: 2px;
 }
 
+.readout-label {
+  color: var(--muted);
+  font-size: 0.64rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.readout-value {
+  font-family: var(--serif);
+  font-size: 1.6rem;
+  font-weight: 400;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.readout-note {
+  color: rgb(244 239 229 / 45%);
+  font-size: 0.7rem;
+}
+
+.readout-chips {
+  margin-left: 0;
+}
+
+.presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1rem 0 0.75rem;
+}
+
+.try-this {
+  max-width: 44rem;
+  margin: 0 0 1.5rem;
+  padding: 0.7rem 1rem;
+  color: var(--muted);
+  background: rgb(131 184 215 / 9%);
+  border-left: 2px solid var(--blue);
+  font-size: 0.84rem;
+}
+
+.try-this strong {
+  color: var(--ink);
+}
+
+.segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+}
+
+.segment {
+  padding: 0.6rem 1rem;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  font: inherit;
+  font-size: 0.76rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: color 180ms ease, background 180ms ease;
+}
+
+.segment + .segment {
+  border-left: 1px solid var(--line);
+}
+
+.segment:hover {
+  color: var(--ink);
+}
+
+.segment[aria-pressed="true"] {
+  color: var(--space);
+  background: var(--blue);
+  font-weight: 600;
+}
+
+.compare-readout {
+  margin: 0.75rem 0 0;
+  color: var(--blue);
+  font-family: var(--mono);
+  font-size: 0.8rem;
+}
+
+/* ---------- Controls ---------- */
 .control-card {
   --accent: var(--gold);
   padding: 1.1rem;
@@ -355,29 +467,47 @@ canvas {
   border-radius: 2px;
 }
 
-.control-card h3 {
+.control-card h3,
+.control-card h4 {
   display: flex;
   gap: 0.5rem;
   align-items: center;
+  margin: 0 0 0.9rem;
   color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .control-card-global {
   --accent: var(--ink);
+  margin-bottom: 1rem;
 }
 
-/* Initial conditions are staged rather than live, so the card is visually
-   set apart from the parameters that take effect immediately. */
-.control-card-initial {
-  --accent: var(--blue);
-  border-color: rgb(131 184 215 / 35%);
-  background: rgb(131 184 215 / 7%);
+.field-grid {
+  display: grid;
+  column-gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
+}
+
+.pendulum-controls {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(13.5rem, 100%), 1fr));
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
 }
 
 .card-note {
   margin: 0 0 1rem;
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: 0.76rem;
   line-height: 1.55;
 }
 
@@ -392,6 +522,99 @@ canvas {
   background: rgb(215 180 112 / 12%);
   border-left: 2px solid var(--gold);
   font-size: 0.7rem;
+}
+
+.pending[hidden] {
+  display: none;
+}
+
+/* ---------- Disclosures ---------- */
+.disclosure,
+.theory {
+  margin-bottom: 0.75rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+}
+
+summary {
+  cursor: pointer;
+}
+
+.disclosure > summary,
+.theory > summary {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  padding: 0.85rem 1.1rem;
+  color: var(--ink);
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  list-style: none;
+  text-transform: uppercase;
+}
+
+.disclosure > summary::-webkit-details-marker,
+.theory > summary::-webkit-details-marker,
+.nested > summary::-webkit-details-marker {
+  display: none;
+}
+
+.disclosure > summary::before,
+.theory > summary::before,
+.nested > summary::before {
+  content: "+";
+  width: 1ch;
+  color: var(--gold);
+  font-family: var(--mono);
+}
+
+.disclosure[open] > summary::before,
+.theory[open] > summary::before,
+.nested[open] > summary::before {
+  content: "−";
+}
+
+.disclosure > summary:hover,
+.theory > summary:hover {
+  background: rgb(244 239 229 / 4%);
+}
+
+.disclosure-body,
+.theory-body {
+  padding: 0.25rem 1.1rem 1.1rem;
+}
+
+.theory > summary {
+  color: var(--blue);
+}
+
+.nested {
+  margin-top: 0.9rem;
+}
+
+.nested > summary {
+  display: flex;
+  gap: 0.5rem;
+  color: var(--muted);
+  font-size: 0.74rem;
+  list-style: none;
+}
+
+.nested > summary:hover {
+  color: var(--ink);
+}
+
+.assumptions {
+  margin: 0 0 1rem;
+  padding-left: 1.1rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.assumptions li + li {
+  margin-top: 0.4rem;
 }
 
 /* Equilibrium chips */
@@ -472,15 +695,15 @@ input[type="range"]::-moz-range-thumb {
 
 .hint {
   margin: 1rem 0 0;
-  color: rgb(244 239 229 / 40%);
-  font-size: 0.72rem;
+  color: rgb(244 239 229 / 50%);
+  font-size: 0.74rem;
 }
 
 /* ---------- Panels ---------- */
 .panel-grid {
   display: grid;
   gap: 1rem;
-  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
   margin-bottom: 1rem;
 }
 
@@ -500,6 +723,7 @@ input[type="range"]::-moz-range-thumb {
 
 /* ---------- Tables ---------- */
 .table-scroll {
+  position: relative; /* contains the visually hidden header cell */
   overflow-x: auto;
 }
 
@@ -610,34 +834,16 @@ input[type="range"]::-moz-range-thumb {
   text-align: right;
 }
 
-/* ---------- Prose / theory ---------- */
-/* The prose column is full width so equations have room; the text inside it is
-   held to a comfortable reading measure instead. */
+/* ---------- Theory ---------- */
 .prose {
   max-width: none;
   margin-bottom: 2rem;
 }
 
-.prose h3 {
-  margin-top: 2rem;
-  color: var(--blue);
-}
-
-.prose p {
+.theory-body p {
   max-width: 44rem;
   color: var(--muted);
   font-size: 0.9rem;
-}
-
-.eq {
-  margin: 1rem 0;
-  padding: 0.9rem 1rem;
-  color: var(--ink) !important;
-  background: rgb(17 26 44 / 60%);
-  border-left: 2px solid var(--gold);
-  font-family: var(--mono);
-  font-size: 0.82rem !important;
-  overflow-x: auto;
 }
 
 .caveat {
@@ -740,6 +946,16 @@ input[type="range"]::-moz-range-thumb {
 
   #spring-canvas {
     aspect-ratio: 16 / 9;
+  }
+
+  .segmented,
+  .segment {
+    width: 100%;
+  }
+
+  .segment + .segment {
+    border-top: 1px solid var(--line);
+    border-left: 0;
   }
 }
 

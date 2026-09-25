@@ -13,7 +13,7 @@ import type { RegimeThresholds } from "./tolerances";
  *
  * This is an instantaneous kinematic classification, not the Phase 2/3 failure
  * taxonomy (no-motion / slip / lateral escape / fore-aft fall / numerical
- * warning), which needs run history rather than one frame. See PLAN.md.
+ * warning), which needs run history rather than one frame. See DEVELOPMENT.md.
  */
 export type Regime = "REST" | "STICKING" | "SLIDING" | "ROCKING" | "TOPPLING" | "AIRBORNE";
 

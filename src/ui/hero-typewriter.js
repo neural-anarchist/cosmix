@@ -7,7 +7,9 @@
 // in sync with the markup and no-ops on any page without a hero.
 // ============================================================
 
-export function createHeroTypewriter() {
+import { playTitleDebris } from "../scene/title-debris.js";
+
+export function createHeroTypewriter(stage) {
   const hero = document.querySelector(".hero");
   if (!hero) return { start: function () {} };
 
@@ -86,6 +88,43 @@ export function createHeroTypewriter() {
     };
   }
 
+  // The tagline is drawn as debris inside the 3D scene, behind the
+  // planets and stars: it gathers into huge letters (3s), holds (1s),
+  // then scatters and fades (5s). The real text stays in the DOM,
+  // visually hidden, for assistive tech. If the effect can't be built
+  // the text is simply shown as-is.
+  function debrisStep(el, target) {
+    return function (done) {
+      const text = target.dataset.typeText || "";
+      target.textContent = text;
+      target.removeAttribute("aria-hidden");
+
+      if (!stage) {
+        done();
+        return;
+      }
+      el.classList.add("sr-only");
+
+      // Wait (briefly) for the web font so the sampled glyphs match.
+      const fontsReady = document.fonts && document.fonts.ready
+        ? Promise.race([document.fonts.ready, new Promise(function (r) { setTimeout(r, 1500); })])
+        : Promise.resolve();
+
+      fontsReady
+        .then(function () {
+          return playTitleDebris(
+            stage.scene, stage.camera, stage.renderer,
+            text, getComputedStyle(el).fontFamily,
+            { form: 3000, hold: 1000, scatter: 5000 }
+          );
+        })
+        .catch(function () {
+          el.classList.remove("sr-only");
+        });
+      done();
+    };
+  }
+
   function cleanupStep() {
     return function (done) {
       cursor.remove();
@@ -101,7 +140,7 @@ export function createHeroTypewriter() {
   h1Lines.forEach(function (line) { steps.push(typeStep(line, 42)); });
   steps.push(waitStep(200));
   if (introLabel) steps.push(revealStep(introLabel));
-  if (introTarget) steps.push(typeStep(introTarget, 9), waitStep(180));
+  if (introTarget) steps.push(debrisStep(introTarget.closest(".intro"), introTarget));
   if (hintTarget) steps.push(typeStep(hintTarget, 15));
   steps.push(cleanupStep(), revealStep(button));
 

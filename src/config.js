@@ -39,7 +39,7 @@ export const CAMERA = {
   // Pushes the rendered system right of centre on wide screens so it
   // never sits on top of the hero type. Cleared on narrow screens,
   // where the hero moves to the bottom instead.
-  viewShift: 0.17,
+  viewShift: 0,
   viewShiftMinWidth: 900,
   minDistance: 4,
   maxDistance: 60,
@@ -125,7 +125,7 @@ export const WORLDS = [
     id: "frontier",
     label: "The Frontier",
     kicker: "Fourth orbit · Archive",
-    description: "Problem sets and solutions from past Cosmix competitions.",
+    description: "A curated directory of outside problem archives, references, communities and tools — the edge of what Cosmix builds itself.",
     color: 0xd5d8df,
     atmosphere: PALETTE.violet,
     size: 0.46,

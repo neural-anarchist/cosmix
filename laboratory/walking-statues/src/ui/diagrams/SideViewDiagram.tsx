@@ -1,4 +1,5 @@
 import { useSimStore } from "../../state/store";
+import { Katex } from "../math/Katex";
 
 const W = 460;
 const H = 300;
@@ -71,7 +72,7 @@ export function SideViewDiagram() {
             <line x1={originX} y1={groundY} x2={px(edgeY)} y2={groundY} />
             <circle cx={px(edgeY)} cy={groundY} r={4} />
             <text x={px(edgeY / 2)} y={groundY - 8} className="dg-label dg-label-mid">
-              b = {b.toFixed(2)} m
+              tipping arm b = {b.toFixed(2)} m
             </text>
           </g>
         )}
@@ -91,12 +92,12 @@ export function SideViewDiagram() {
           strokeDasharray="4 4"
         />
         <text x={px(com.y) - 8} y={py(com.z) - 12} className="dg-label dg-label-end">
-          COM z = {com.z.toFixed(2)} m
+          center of mass height = {com.z.toFixed(2)} m
         </text>
         {/* weight vector */}
         <line x1={px(com.y)} y1={py(com.z)} x2={px(com.y)} y2={py(com.z) + 40} className="dg-weight" />
         <text x={px(com.y) + 7} y={py(com.z) + 34} className="dg-label">
-          Mg
+          weight
         </text>
 
         {/* torque arm: pivot edge -> attachment */}
@@ -114,7 +115,7 @@ export function SideViewDiagram() {
           strokeDasharray="4 4"
         />
         <text x={px(attach.y) + 8} y={py(attach.z) - 12} className="dg-label">
-          z_anchor = {attach.z.toFixed(2)} m
+          attachment height z_a = {attach.z.toFixed(2)} m
         </text>
         <circle cx={px(attach.y)} cy={py(attach.z)} r={4.5} className="dg-attach" />
 
@@ -137,9 +138,10 @@ export function SideViewDiagram() {
       <figcaption>
         Rear elevation of the {activeSide} rope. The thin line from the contact
         edge up to the attachment is the torque arm; tipping begins when{" "}
-        <em>T·d̂<sub>y</sub>·z_anchor</em> overcomes the restoring{" "}
-        <em>Mg·b</em>. A rocker base has no <em>b</em> at all, which is why no
-        static tipping threshold is reported for it.
+        <Katex tex="T\,\hat{d}_y\,z_a" srLabel="tension times the lateral direction times attachment height" />{" "}
+        overcomes the restoring <Katex tex="Mg\,b" srLabel="weight times the half-width" />. A rocker base has no{" "}
+        <Katex tex="b" srLabel="b" /> at all, which is why no static tipping
+        threshold is reported for it.
       </figcaption>
     </figure>
   );

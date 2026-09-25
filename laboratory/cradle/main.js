@@ -1,93 +1,60 @@
 'use strict';
 
-/* ============================================================================
- * MAGNETIC PENDULUM CRADLE
- *
- * N identical-length pendulums (2–5) hang from pivots on a horizontal line.
- * Every bob carries a magnetic dipole of the SAME fixed orientation in space —
- * think bar magnets all glued pointing the same way, north poles parallel.
- * They do not rotate with the rods.
- *
- * That single fact sets the character of the whole system. Because the dipole
- * directions never change, the interaction depends only on how the bobs move
- * relative to one another, and the coupling is controlled by one geometric
- * factor G(α) that can be positive, negative, or exactly zero.
- *
- * ---------------------------------------------------------------------------
- * DIPOLE INTERACTION
- *
- * With ŝ = (cos α, sin α) the common dipole direction and r the vector from
- * bob i to bob j, the standard dipole–dipole energy is
- *
- *   U_ij = (μ0 μi μj / 4π) [ 1 − 3 (ŝ·r̂)² ] / r³
- *
- * (the m_i·m_j term is μiμj because the dipoles are parallel). The simulation
- * evaluates this exactly, with the true bob positions, and differentiates it
- * analytically for the torques — see magneticTorques().
- *
- * SMALL-OSCILLATION LIMIT. Near equilibrium the bobs sit at the same height,
- * so r is horizontal, r̂ = x̂, and ŝ·r̂ = cos α. Then
- *
- *   U_ij → (μ0 μi μj / 4π) G(α) / u³ ,   G(α) = 1 − 3cos²α
- *   u = (j−i)d + L(θ_j − θ_i)
- *
- * Expanding in the small displacement δ = L(θ_j − θ_i):
- *
- *   U_ij ≈ (C G / D³)[ 1 − 3δ/D + 6δ²/D² ]
- *
- *   • the LINEAR term is a constant torque — the magnets pull the cradle
- *     together (or push it apart), displacing the equilibrium away from
- *     vertical. We solve for that equilibrium rather than assuming θ* = 0.
- *   • the QUADRATIC term is the coupling. Matching ½κ(θi−θj)² gives
- *
- *         κ_ij = 12 μ0 μi μj G(α) L² / (4π D_ij⁵)
- *
- * Verified numerically: this closed form equals the second derivative of the
- * EXACT interaction at equilibrium to 8 significant figures, for every α. So
- * the theory below is not an approximation of the simulation — it is exactly
- * its linearization.
- *
- * THE GEOMETRIC FACTOR G(α) = 1 − 3cos²α is the whole story of the coupling:
- *
- *   α = 0°       G = −2    dipoles horizontal, head-to-tail → ATTRACT,
- *                          κ < 0, anti-phase mode is the SOFT one
- *   α = 54.7356° G =  0    the magic angle — coupling vanishes identically,
- *                          the pendulums decouple no matter how strong μ is
- *   α = 90°      G = +1    dipoles vertical, side-by-side → REPEL,
- *                          κ > 0, in-phase mode is the soft one
- *
- * Note κ ∝ 1/D⁵ here, not 1/D³: the coupling is a second derivative of the
- * energy with respect to position, so a next-nearest neighbour couples 2⁵ = 32
- * times more weakly than an adjacent one.
- *
- * ---------------------------------------------------------------------------
- * EQUATION OF MOTION (what is integrated, with fully nonlinear gravity)
- *
- *   m_i L² θ¨_i = −m_i g L sin θ_i − b m_i L² θ˙_i + Σ_{j≠i} τ_ij(θ)
- *
- * with τ_ij the exact analytic dipole torque. Damping b has units 1/s and acts
- * identically on every pendulum regardless of mass.
- * ========================================================================== */
+// =============================================================================
+// Magnetic pendulum cradle
+//
+// Units: SI (m, kg, s, rad); dipole moments in A·m²; damping b in s⁻¹.
+// Coordinates: θ_i is the rod angle from the downward vertical, positive toward
+// +x. The dipole angle α is measured anticlockwise from +x, y pointing up.
+//
+// Model assumptions
+//   - N (2–5) point-mass bobs on massless rods of common length L, with pivots
+//     spaced d apart on a horizontal line.
+//   - Every dipole axis ŝ = (cos α, sin α) is CONSTRAINED to stay fixed in the
+//     laboratory frame. A magnet glued to a swinging bob would rotate with it;
+//     holding the axes parallel needs an external field, a gimbal or active
+//     control. This is an idealization, not a generic magnet-on-pendulum result.
+//   - Pair energy is a softened point dipole (see SOFTENING_FRACTION).
+//   - No aerodynamic coupling, pivot friction, rod flexibility or hysteresis.
+//     Damping is viscous: −b m_i L² θ̇_i.
+//
+// Pair energy, with r = r_j − r_i (unsoftened form):
+//   U_ij = (μ0 μ_i μ_j / 4π) [1 − 3(ŝ·r̂)²] / r³
+// For bobs at equal height ŝ·r̂ = cos α, so U_ij → C G(α) / u³ with
+//   G(α) = 1 − 3cos²α,   u = (j−i)d + L(θ_j − θ_i).
+// G > 0 repels (α = 90°), G < 0 attracts (α = 0°), and G = 0 at the magic angle
+// α = arccos(1/√3) ≈ 54.74° in the point-dipole limit.
+//
+// Equation of motion (integrated with nonlinear gravity):
+//   m_i L² θ̈_i = −m_i g L sin θ_i − b m_i L² θ̇_i + Σ_{j≠i} τ_ij(θ),
+//   τ_ij = −∂U_ij/∂θ_i.
+//
+// Linearization about the resting state θ*, with η = θ − θ*:
+//   M η̈ + K η = 0 (plus the same viscous damping), K = −∂τ/∂θ at θ*,
+// where K is obtained by central differences of the torque, so it is the
+// linearization of the regularized model actually integrated. Expanding the
+// point-dipole energy in δ = L(θ_j − θ_i) gives the nearest-pair coupling
+//   κ_ij = 12 μ0 μ_i μ_j G L² / (4π u*⁵),
+// with u* the gap at the resting state, not the nominal (j−i)d.
+//
+// Numerical checks live in runDiagnostics() at the end of this file; call
+// cradleDiagnostics() from the browser console.
+// =============================================================================
 
-/* ---------------------------------------------------------------------------
- * Constants and helpers
- * ------------------------------------------------------------------------- */
+// -----------------------------------------------------------------------------
+// Constants and helpers
+// -----------------------------------------------------------------------------
 
 const MU0_OVER_4PI = 1e-7; // μ0/4π, in T·m/A
 
 /**
- * Softening length, as a fraction of the pivot spacing.
+ * Softening length ε as a fraction of the pivot spacing.
  *
- * Real magnets are not points. Once the gap between two bobs becomes
- * comparable to a magnet's own size the point-dipole formula badly
- * overestimates the force, and taken literally it diverges as 1/r⁵. We
- * therefore evaluate the interaction at q = √(r² + ε²) with ε a length
- * standing in for the magnet's physical extent.
- *
- * This is not a numerical patch bolted onto the force: q replaces r in the
- * POTENTIAL, and the torques are the exact gradient of that potential, so
- * energy is still conserved to machine precision. At normal separations
- * (r ≈ d) the correction is a fraction of a percent.
+ * The pair energy is evaluated at q = √(r² + ε²) instead of r. This is a
+ * regularization that keeps the 1/r⁵ force finite when bobs meet; ε represents
+ * finite magnet size only qualitatively and is not calibrated to any magnet.
+ * Because q enters the potential itself, the torques are the exact analytical
+ * gradient of the regularized potential (checked in runDiagnostics).
  */
 const SOFTENING_FRACTION = 0.03;
 
@@ -214,9 +181,9 @@ function jacobiEigen(input, maxSweeps = 100, tol = 1e-14) {
   return { values: A.map((row, i) => row[i]), vectors: V };
 }
 
-/* ---------------------------------------------------------------------------
- * MagneticCradle — the nonlinear system
- * ------------------------------------------------------------------------- */
+// -----------------------------------------------------------------------------
+// Nonlinear magnetic pendulum model
+// -----------------------------------------------------------------------------
 
 class MagneticCradle {
   constructor(params) {
@@ -225,10 +192,8 @@ class MagneticCradle {
   }
 
   /**
-   * Restart the run. Initial conditions apply to the left-most pendulum only
-   * and are measured FROM the resting position, so θ₀ reads as "how far you
-   * pull the first bob aside before letting go". Every other pendulum starts
-   * exactly at rest, which makes the modal decomposition start clean.
+   * Restart the run. θ₀ and ω₀ apply to the left-most pendulum only and are
+   * measured from the resting position; all other pendulums start at rest there.
    */
   reset(equilibrium) {
     const { N, theta0, omega0 } = this.params;
@@ -247,13 +212,11 @@ class MagneticCradle {
   }
 
   /**
-   * Exact analytic dipole torques for every pair.
+   * Dipole torques for every pair: the analytical gradient of the regularized
+   * potential (not a numerical derivative).
    *
-   * U = K [ 1/r³ − 3p²/r⁵ ],  p = r·ŝ,  K = μ0μiμj/4π
-   * dU = K [ −3 dr/r⁴ − 6 p dp/r⁵ + 15 p² dr/r⁶ ]
-   *
-   * The gradient was verified against central differences with textbook h²
-   * convergence, so this is the true derivative rather than a fitted model.
+   * U = K [ 1/q³ − 3p²/q⁵ ],  q² = |r|² + ε²,  p = r·ŝ,  K = μ0μiμj/4π
+   * dU = K [ −3 dq/q⁴ − 6 p dp/q⁵ + 15 p² dq/q⁶ ]
    */
   magneticTorques(theta) {
     const { N, L, mu, d, alpha } = this.params;
@@ -262,8 +225,6 @@ class MagneticCradle {
     const ca = Math.cos(deg2rad(alpha));
     const sa = Math.sin(deg2rad(alpha));
 
-    // Bobs have finite size; without a floor the 1/r⁵ terms blow up if strong
-    // attraction pulls two bobs onto each other.
     const eps = SOFTENING_FRACTION * d;
     const epsSq = eps * eps;
     this.contactHit = false;
@@ -276,9 +237,7 @@ class MagneticCradle {
         const dx = D + L * (Math.sin(theta[j]) - Math.sin(theta[i]));
         const dy = -L * (Math.cos(theta[j]) - Math.cos(theta[i]));
 
-        // q is the softened separation. Because q replaces r inside the
-        // potential itself — and these torques are its exact gradient — the
-        // system stays conservative no matter how close the bobs come.
+        // r below is the softened separation q; trueR is the geometric gap.
         const trueR = Math.hypot(dx, dy);
         closest = Math.min(closest, trueR);
         if (trueR < 3 * eps) this.contactHit = true;
@@ -351,13 +310,12 @@ class MagneticCradle {
   }
 
   /**
-   * Advance by a wall-clock interval with a substep count that adapts to how
-   * stiff the system currently is.
-   *
-   * The dipole force goes as 1/r⁵, so two bobs swinging close together can be
-   * four orders of magnitude stiffer than they are at rest — a fixed step that
-   * is fine at equilibrium will visibly leak energy there. Scaling the substep
-   * count by the closest approach keeps RK4 resolved through those encounters.
+   * Numerical-safety policy: advance by dt with fixed-step RK4, splitting dt
+   * into substeps. The dipole force scales as 1/r⁵, so the system stiffens
+   * sharply when bobs approach; the substep count grows as (d / closest gap)^2.5,
+   * capped at 120× the base rate and 4000 substeps per call. RK4 is not
+   * symplectic, so undamped energy drifts slowly (reported in the UI and
+   * bounded in runDiagnostics).
    */
   advance(dt) {
     const baseRate = 1440;
@@ -365,17 +323,14 @@ class MagneticCradle {
     const ratio = Math.max(1, this.params.d / Math.max(gap, 1e-4));
     const factor = clamp(Math.pow(ratio, 2.5), 1, 120);
 
-    // A large initial pull swings a bob most of the way to its neighbour
-    // whatever the sign of the coupling, so close encounters are geometric
-    // rather than magnetic — the refinement has to be driven by the gap, not
-    // by the field strength. Convergence was checked explicitly: halving the
-    // step size cuts the energy drift by two to four orders of magnitude.
+    // The gap, not the field strength, drives refinement: a large pull brings
+    // bobs together whatever the sign of the coupling.
     const steps = clamp(Math.ceil(dt * baseRate * factor), 1, 4000);
     const h = dt / steps;
     for (let s = 0; s < steps; s++) this.rk4Step(h);
   }
 
-  /** Exact interaction energy, used for the conservation readout. */
+  /** Regularized interaction energy; the potential whose gradient is magneticTorques. */
   magneticEnergy(theta) {
     const { N, L, mu, d, alpha } = this.params;
     const ca = Math.cos(deg2rad(alpha));
@@ -388,7 +343,6 @@ class MagneticCradle {
         const D = (j - i) * d;
         const dx = D + L * (Math.sin(theta[j]) - Math.sin(theta[i]));
         const dy = -L * (Math.cos(theta[j]) - Math.cos(theta[i]));
-        // Same softened separation the torques use, so E is their true integral.
         const r = Math.sqrt(dx * dx + dy * dy + epsSq);
         const p = dx * ca + dy * sa;
         total += MU0_OVER_4PI * mu[i] * mu[j] * (1 / r ** 3 - (3 * p * p) / r ** 5);
@@ -397,6 +351,7 @@ class MagneticCradle {
     return total;
   }
 
+  /** Total mechanical energy (kinetic + gravity + magnetic). The magnetic term has an arbitrary offset. */
   energy() {
     const { N, L, m, g } = this.params;
     let total = 0;
@@ -409,13 +364,23 @@ class MagneticCradle {
   }
 
   /**
-   * Stiffness matrix K = −∂τ/∂θ, by central differences on the exact torque.
-   *
-   * Differentiating numerically rather than by hand guarantees K is exactly
-   * the linearization of what the integrator actually does. h = 1e-6 is the
-   * measured sweet spot: truncation and roundoff cross at ~1e-11 relative.
+   * Excitation energy: mechanical energy above the resting configuration at
+   * zero velocity. Unlike energy(), it does not depend on the magnetic offset.
    */
-  stiffness(theta) {
+  excitationEnergy(equilibriumTheta) {
+    const { N } = this.params;
+    const { L, m, g } = this.params;
+    let rest = this.magneticEnergy(equilibriumTheta);
+    for (let i = 0; i < N; i++) rest += m[i] * g * L * (1 - Math.cos(equilibriumTheta[i]));
+    return this.energy() - rest;
+  }
+
+  /**
+   * Stiffness matrix K = −∂τ/∂θ by central differences (h = 1e-6) of the
+   * analytical torque, so it linearizes the model that is actually integrated.
+   * Pass { raw: true } to skip the symmetrization used by the eigensolver.
+   */
+  stiffness(theta, { raw = false } = {}) {
     const N = this.params.N;
     const h = 1e-6;
     const K = zeros2(N);
@@ -430,8 +395,8 @@ class MagneticCradle {
       for (let i = 0; i < N; i++) K[i][j] = -(tp[i] - tm[i]) / (2 * h);
     }
 
-    // K is symmetric in exact arithmetic; enforce it so the eigensolver sees
-    // a genuinely symmetric matrix.
+    if (raw) return K;
+    // Symmetric in exact arithmetic; average away finite-difference noise.
     for (let i = 0; i < N; i++) {
       for (let j = i + 1; j < N; j++) {
         const avg = 0.5 * (K[i][j] + K[j][i]);
@@ -445,9 +410,8 @@ class MagneticCradle {
   /**
    * Static equilibrium by damped Newton–Raphson.
    *
-   * The magnets exert a net force even at θ = 0, so the cradle hangs slightly
-   * splayed (repulsion) or pulled together (attraction). Modes must be taken
-   * about THIS configuration, not about vertical.
+   * The magnets exert a net torque at θ = 0, so the resting state is generally
+   * not vertical; linearization is taken about this state.
    *
    * Since J = ∂F/∂θ = −K, the Newton step is θ ← θ + K⁻¹F.
    */
@@ -464,8 +428,7 @@ class MagneticCradle {
       const step = solveLinear(K, F);
       if (!step) return { theta, converged: false, residual };
 
-      // Damp the step so a poor starting guess cannot overshoot into the
-      // singular region where two bobs coincide.
+      // Limit the step to 0.25 rad to avoid overshooting toward bob contact.
       let scale = 1;
       const maxStep = Math.max(...step.map(Math.abs));
       if (maxStep > 0.25) scale = 0.25 / maxStep;
@@ -478,12 +441,9 @@ class MagneticCradle {
   }
 
   /**
-   * Closed-form small-angle coupling  κ_ij = 12 μ0 μi μj G(α) L² / (4π u⁵).
-   *
-   * u must be the separation at the RESTING position, not the nominal (j−i)d.
-   * The magnets displace the cradle, and because κ ∝ 1/u⁵ even a 7% change in
-   * gap moves the coupling by nearly 50%. Passing the equilibrium angles is
-   * what makes this formula agree with the numerical stiffness.
+   * Pair coupling κ_ij, the second derivative of the regularized potential
+   * along the row. Point-dipole limit: 12 μ0 μi μj G(α) L² / (4π u⁵).
+   * `reference` supplies the resting angles so u is the resting gap u*.
    */
   analyticKappa(i, j, reference) {
     const { L, mu, d, alpha } = this.params;
@@ -491,13 +451,10 @@ class MagneticCradle {
     if (reference && reference.length > Math.max(i, j)) {
       u += L * (Math.sin(reference[j]) - Math.sin(reference[i])) * Math.sign(j - i);
     }
-    // Exact second derivative of the SOFTENED potential along the row:
-    //
+    // Second derivative of the softened potential with respect to u
+    // (retaken, since ∂q/∂u ≠ 1):
     //   κ = L²C[ −(3+6c)q⁻⁵ + (15+75c)u²q⁻⁷ − 105c·u⁴q⁻⁹ ],  c = cos²α
-    //
-    // Substituting q for u in the point-dipole result would NOT be right —
-    // softening changes ∂q/∂u, so the derivative has to be retaken. As ε → 0
-    // this collapses to the clean 12CGL²/u⁵ quoted in the theory.
+    // which reduces to 12CGL²/u⁵ as ε → 0.
     const c = Math.cos(deg2rad(alpha)) ** 2;
     const eps = SOFTENING_FRACTION * d;
     const q = Math.sqrt(u * u + eps * eps);
@@ -510,11 +467,9 @@ class MagneticCradle {
   }
 
   /**
-   * The diagonal "tilt" term. When the dipoles are oblique the interaction
-   * acquires a piece that does not couple the coordinates but does change each
-   * pendulum's own restoring torque — and with opposite sign on either side of
-   * a pair, because a tilted dipole direction breaks the left–right mirror
-   * symmetry of the row. It vanishes identically at α = 0° and α = 90°.
+   * Diagonal "tilt" term for oblique dipoles: it shifts each pendulum's own
+   * restoring torque (with opposite sign on the two members of a pair) but
+   * does not couple coordinates. It vanishes at α = 0° and 90°.
    *
    *   σ_i = Σ_j sgn(j−i) · 3 μ0 μi μj L sin(2α) / (4π u_ij⁴)
    */
@@ -530,8 +485,7 @@ class MagneticCradle {
       if (reference && reference.length > Math.max(i, j)) {
         u += L * (Math.sin(reference[j]) - Math.sin(reference[i])) * Math.sign(j - i);
       }
-      // σ comes from (∂U/∂dy)(∂²dy/∂θ²); softened, that is 3CLu·sin2α/q⁵,
-      // which reduces to 3CL·sin2α/u⁴ when ε → 0.
+      // Softened form of σ; reduces to 3CL·sin2α/u⁴ as ε → 0.
       const q = Math.sqrt(u * u + (SOFTENING_FRACTION * d) ** 2);
       total += Math.sign(j - i) * (3 * MU0_OVER_4PI * mu[i] * mu[j] * L * Math.abs(u) * sin2a) / q ** 5;
     }
@@ -539,18 +493,15 @@ class MagneticCradle {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * NormalModeAnalyzer
- * ------------------------------------------------------------------------- */
+// -----------------------------------------------------------------------------
+// Normal-mode analysis
+// -----------------------------------------------------------------------------
 
 class NormalModeAnalyzer {
   /**
-   * Solves K v = λ M v about the true equilibrium.
-   *
-   * M is diagonal and positive definite, so rather than forming M⁻¹K (which
-   * is not symmetric) we symmetrize: with S = M^(−1/2), A = S K S is
-   * symmetric, shares eigenvalues, and its eigenvectors map back as v = S u,
-   * arriving M-orthonormal (vᵀMv = 1).
+   * Solves K v = λ M v about the resting state. With S = M^(−1/2), the matrix
+   * A = S K S is symmetric with the same eigenvalues; eigenvectors map back as
+   * v = S u and are M-orthonormal (vᵀMv = 1).
    */
   analyze(system) {
     const { N, L, m } = system.params;
@@ -605,27 +556,19 @@ class NormalModeAnalyzer {
   }
 
   /**
-   * Closed-form solution for the uniform chain with nearest-neighbour coupling.
-   *
-   * When every pendulum is identical, K = mgL·I + κ·(path-graph Laplacian).
-   * That Laplacian's spectrum is known exactly:
-   *
-   *   eigenvalues   4 sin²(kπ/2N)
-   *   eigenvectors  v_k[i] = cos(kπ(i+½)/N)
-   *
-   * giving      ω_k² = g/L + (4κ / mL²) · sin²(kπ/2N),  k = 0 … N−1
-   *
-   * Mode k = 0 is uniform, and because a Laplacian annihilates constant
-   * vectors it always sits at exactly √(g/L) — untouched by the magnets.
+   * Uniform-chain closed form. Assumes equal masses and moments, nearest-
+   * neighbour coupling only, cos θ* ≈ 1 and no oblique tilt term, so that
+   * K ≈ mgL·I + κ·(path-graph Laplacian). The Laplacian spectrum
+   *   eigenvalues 4 sin²(kπ/2N),  eigenvectors v_k[i] = cos(kπ(i+½)/N)
+   * gives ω_k² = g/L + (4κ / mL²) sin²(kπ/2N), k = 0 … N−1.
+   * It is an approximation to the numerical modes whenever any assumption fails.
    */
   analytic(system, equilibrium) {
     const { N, L, m, mu, g, alpha } = system.params;
 
     const uniformMass = m.slice(0, N).every((v) => Math.abs(v - m[0]) < 1e-12);
     const uniformMu = mu.slice(0, N).every((v) => Math.abs(v - mu[0]) < 1e-12);
-    // The tilt term is a diagonal, mirror-asymmetric contribution that the
-    // uniform-chain formula has no way to represent, so the closed form is
-    // only exact where sin 2α vanishes: α = 0° or 90°.
+    // The tilt term (∝ sin 2α) is absent from the closed form.
     const symmetric = Math.abs(Math.sin(2 * deg2rad(alpha))) < 1e-9;
     const applicable = uniformMass && uniformMu;
 
@@ -649,10 +592,8 @@ class NormalModeAnalyzer {
       });
     }
 
-    // Sort ascending to match the numerical modes. This matters: when κ < 0
-    // the frequency DECREASES with k, so index k of the closed form and index
-    // k of the sorted numerical list are different modes entirely, and the
-    // comparison column would pair them up wrongly.
+    // Sort ascending to pair with the sorted numerical modes (for κ < 0 the
+    // frequency decreases with k).
     frequencies.sort((a, b) => {
       if (a.stable && b.stable) return a.omega - b.omega;
       return a.omegaSq - b.omegaSq;
@@ -697,29 +638,22 @@ class NormalModeAnalyzer {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * SpringMassSystem
- *
- * Mapping. Linearize about equilibrium and substitute x_i = L·η_i:
- *
- *   m_i L² η¨_i = −Σ_j K_ij η_j    →    m_i x¨_i = −Σ_j (K_ij / L²) x_j
- *
- * so with a single global length the analog is EXACT, not approximate:
- *
- *   M_i = m_i ,  k_i = m_i g / L (from the gravity part of K_ii) ,
- *   k_ij = κ_ij / L²
- *
- * Because every pendulum now shares one L, the old caveat about the coupling
- * force not being a function of (x_i − x_j) alone has gone away entirely.
- *
- * Runs in "driven" mode: positions are sampled from the pendulum state so the
- * two pictures cannot drift apart. The scaffolding for integrating the linear
- * system independently is behind the same interface.
- * ------------------------------------------------------------------------- */
+// -----------------------------------------------------------------------------
+// Spring–mass coordinates and the independent linear model
+// -----------------------------------------------------------------------------
 
+/**
+ * Spring–mass coordinates x_i = L·η_i, with η measured from the resting state.
+ * Dividing M η̈ + K η = 0 by L gives x̃¨_i = −Σ_j K_ij x_j / (m_i L²): a chain of
+ * unit-length-scaled oscillators. `derived` reports the gravity and pair-spring
+ * constants used to draw the springs; the full K also contains cos θ* and tilt
+ * terms on its diagonal.
+ *
+ * `sampleFrom` maps the nonlinear state into these coordinates. It is a
+ * visualization only — it is not an independent simulation (see LinearModel).
+ */
 class SpringMassSystem {
   constructor() {
-    this.mode = 'driven';
     this.x = [];
     this.v = [];
   }
@@ -750,31 +684,119 @@ class SpringMassSystem {
       this.v[i] = L * system.omega[i];
     }
   }
+}
 
-  step(dt, params, derivedParams) {
-    if (this.mode !== 'independent') return;
-    const { masses, ground, coupling } = derivedParams;
-    const N = masses.length;
-    const accel = new Array(N);
+/**
+ * Independent linearized model: η¨_i = −Σ_j K_ij η_j / (m_i L²) − b η̇_i, with η
+ * measured from the resting state (spring coordinates are x_i = L·η_i). It is
+ * integrated with fixed-step RK4 on the same clock as the nonlinear cradle and
+ * never reads the nonlinear state after reset(), so the two can separate.
+ */
+class LinearModel {
+  constructor() {
+    this.eta = [];
+    this.etaDot = [];
+    this.time = 0;
+  }
+
+  /** Initialize from the nonlinear state, projected about the resting state. */
+  reset(system, analysis) {
+    const N = system.params.N;
+    this.eta = new Array(N);
+    this.etaDot = new Array(N);
     for (let i = 0; i < N; i++) {
-      let force = -ground[i] * this.x[i];
-      for (let j = 0; j < N; j++) {
-        if (j !== i) force -= coupling[i][j] * (this.x[i] - this.x[j]);
-      }
-      accel[i] = force / masses[i] - params.damping * this.v[i];
+      this.eta[i] = system.theta[i] - analysis.equilibrium.theta[i];
+      this.etaDot[i] = system.omega[i];
     }
+    this.time = system.time;
+  }
+
+  /** Keep the same absolute angles when the resting state moves (parameter edit). */
+  rebase(oldEq, newEq) {
+    if (oldEq.length !== newEq.length || oldEq.length !== this.eta.length) return;
+    for (let i = 0; i < this.eta.length; i++) this.eta[i] += oldEq[i] - newEq[i];
+  }
+
+  /** Spring coordinates x_i = L·η_i, in metres. */
+  coordinates(L) {
+    return this.eta.map((e) => L * e);
+  }
+
+  accel(eta, etaDot, analysis, damping) {
+    const { K, massDiag } = analysis;
+    const N = eta.length;
+    const out = new Array(N);
     for (let i = 0; i < N; i++) {
-      this.v[i] += accel[i] * dt;
-      this.x[i] += this.v[i] * dt;
+      let force = 0;
+      for (let j = 0; j < N; j++) force -= K[i][j] * eta[j];
+      out[i] = force / massDiag[i] - damping * etaDot[i];
     }
+    return out;
+  }
+
+  rk4Step(h, analysis, damping) {
+    const N = this.eta.length;
+    const shift = (base, delta, f) => base.map((b, i) => b + delta[i] * f);
+    const y = this.eta;
+    const v = this.etaDot;
+    const a1 = this.accel(y, v, analysis, damping);
+    const y2 = shift(y, v, h / 2);
+    const v2 = shift(v, a1, h / 2);
+    const a2 = this.accel(y2, v2, analysis, damping);
+    const y3 = shift(y, v2, h / 2);
+    const v3 = shift(v, a2, h / 2);
+    const a3 = this.accel(y3, v3, analysis, damping);
+    const y4 = shift(y, v3, h);
+    const v4 = shift(v, a3, h);
+    const a4 = this.accel(y4, v4, analysis, damping);
+    for (let i = 0; i < N; i++) {
+      this.eta[i] += (h / 6) * (v[i] + 2 * v2[i] + 2 * v3[i] + v4[i]);
+      this.etaDot[i] += (h / 6) * (a1[i] + 2 * a2[i] + 2 * a3[i] + a4[i]);
+    }
+    this.time += h;
+  }
+
+  /** Advance by dt in RK4 steps of at most 1/720 s (the linear system is not stiff). */
+  advance(dt, analysis, damping) {
+    if (this.eta.length !== analysis.K.length) return;
+    const steps = clamp(Math.ceil(dt * 720), 1, 400);
+    const h = dt / steps;
+    for (let s = 0; s < steps; s++) this.rk4Step(h, analysis, damping);
   }
 }
 
-/* ---------------------------------------------------------------------------
- * Rendering
- * Every draw routine takes a viewport {x, y, w, h} so the same code serves
- * both the dedicated canvases and the side-by-side comparison.
- * ------------------------------------------------------------------------- */
+/** RMS difference between two coordinate vectors, sqrt(mean((a_i − b_i)²)). */
+function rmsDifference(a, b) {
+  const N = a.length;
+  if (!N || b.length !== N) return NaN;
+  let sum = 0;
+  for (let i = 0; i < N; i++) sum += (a[i] - b[i]) ** 2;
+  return Math.sqrt(sum / N);
+}
+
+/**
+ * Analytic solution of one mode of the linearized, uniformly damped system for
+ * η(0) = a·v, η̇(0) = 0. Returns the scalar factors (position, velocity) that
+ * multiply a·v. Underdamped: e^(−bt/2)(cos ω_d t + (b/2ω_d) sin ω_d t) with
+ * ω_d² = λ − b²/4. If ω_d² ≤ 0 the mode is treated as undamped.
+ */
+function modeEnvelope(lambda, damping, t) {
+  const wd2 = lambda - (damping * damping) / 4;
+  const damped = wd2 > 1e-12;
+  const wd = damped ? Math.sqrt(wd2) : Math.sqrt(Math.max(lambda, 0));
+  const beta = damped ? damping / 2 : 0;
+  const env = Math.exp(-beta * t);
+  const c = Math.cos(wd * t);
+  const sn = Math.sin(wd * t);
+  return {
+    position: env * (c + (wd > 0 ? (beta / wd) * sn : 0)),
+    velocity: -env * (wd > 0 ? ((wd * wd + beta * beta) / wd) * sn : 0)
+  };
+}
+
+// -----------------------------------------------------------------------------
+// Rendering (draw routines take a viewport {x, y, w, h})
+// -----------------------------------------------------------------------------
 
 function syncCanvas(canvas) {
   const ctx = canvas.getContext('2d');
@@ -814,11 +836,7 @@ function captionText(ctx, text, x, y, color = PALETTE.muted, size = 10) {
   ctx.restore();
 }
 
-/**
- * A bob magnet. The poles are split perpendicular to the GLOBAL dipole
- * direction and stay fixed as the pendulum swings — that is the physical
- * point of this version of the model.
- */
+/** A bob magnet, drawn with its axis fixed in the laboratory frame (see model assumptions). */
 function drawMagnetBob(ctx, x, y, radius, alphaDeg, mu, accent) {
   // Physics α measures from +x with y up; canvas y runs down.
   const dirX = Math.cos(deg2rad(alphaDeg));
@@ -1105,42 +1123,77 @@ function drawSprings(ctx, springs, system, derived, vp, options = {}) {
   ctx.restore();
 }
 
-/* ---------------------------------------------------------------------------
- * App
- * ------------------------------------------------------------------------- */
+// -----------------------------------------------------------------------------
+// Application
+// -----------------------------------------------------------------------------
 
-// Per-pendulum sliders. Initial conditions are no longer here: they are global,
-// apply to the left-most pendulum only, and take effect on Reset.
+// Per-pendulum sliders. Initial conditions are global: they apply to the
+// left-most pendulum only and take effect on Reset.
 const LIMITS = {
   m: { min: 0.05, max: 0.5, step: 0.005, digits: 3, unit: ' kg', label: 'Mass m' },
   mu: { min: 0, max: 20, step: 0.25, digits: 2, unit: ' A·m²', label: 'Dipole μ' }
 };
 
+// Amplitude and error thresholds for the linear-model warnings.
+const LARGE_AMPLITUDE_RAD = 0.3;
+const LINEAR_ERROR_THRESHOLD = 0.1; // RMS difference / RMS displacement
+
+// Mismatch pattern for "Introduce a small mismatch": relative offsets per bob.
+const MISMATCH_MASS = [0, 0.1, -0.1, 0.05, -0.05];
+const MISMATCH_MU = [0, -0.08, 0.08, -0.04, 0.04];
+
 function defaultParams() {
   return {
     N: 3,
-    L: 0.32, // global — every pendulum shares this length
+    L: 0.32, // common to every pendulum
     m: [0.18, 0.18, 0.18, 0.18, 0.18],
-    // 5 A·m² is a substantial but realistic neodymium magnet. Larger values at
-    // α = 0 pull the bobs close enough that the 1/r⁵ force becomes very stiff.
+    // Illustrative default moment. Larger values at α = 0 pull the bobs close
+    // enough that the 1/r⁵ force becomes very stiff.
     mu: [5, 5, 5, 5, 5],
     theta0: 0.22, // left-most pendulum only, applied on Reset
     omega0: 0,
     g: 9.81,
     d: 0.16,
-    // Dipole orientation, degrees anticlockwise from +x. 90° points every
-    // north pole straight up, which is the natural resting arrangement: the
-    // magnets then sit side-by-side and repel, G(α) = +1.
-    alpha: 90,
+    alpha: 90, // degrees anticlockwise from +x; 90° = every north pole up
     damping: 0.02
   };
 }
+
+// Presets only set existing parameters.
+const PRESETS = {
+  repulsive: (p) => {
+    p.alpha = 90;
+  },
+  decoupled: (p) => {
+    p.alpha = MAGIC_ANGLE_DEG;
+  },
+  attractive: (p) => {
+    p.alpha = 0;
+  },
+  unequal: (p) => {
+    p.N = 3;
+    p.alpha = 90;
+    p.m = [0.18, 0.12, 0.26, 0.18, 0.18];
+    p.mu = [5, 3.5, 6.5, 5, 5];
+  },
+  // At α = 0° and μ = 7 A·m² the softest mode has λ ≈ 3.7 s⁻² against g/L ≈ 30.7 s⁻².
+  near: (p) => {
+    p.N = 3;
+    p.alpha = 0;
+    p.mu = [7, 7, 7, 7, 7];
+  }
+};
+
+const fmtAngle = (v) => `${v.toFixed(2)}°`;
+const fmtRad = (v) => `${v.toFixed(2)} rad`;
+const fmtRate = (v) => `${v.toFixed(2)} rad/s`;
 
 class App {
   constructor() {
     this.params = defaultParams();
     this.system = new MagneticCradle(this.params);
     this.springs = new SpringMassSystem();
+    this.linear = new LinearModel();
     this.analyzer = new NormalModeAnalyzer();
 
     this.canvases = {
@@ -1150,27 +1203,27 @@ class App {
     };
 
     this.playing = true;
+    this.viewMode = 'mapped'; // 'mapped' | 'independent'
     this.modeIndex = null;
     this.modeTime = 0;
     this.modeAmplitude = 0.26;
     this.lastFrame = performance.now();
     this.uiClock = 0;
-
     this.initialsPending = false;
+    this.energyBase = 0;
+    this.energyMaxDrift = 0;
+    this.staticWarnings = [];
+    this.warningKey = '';
+    this.analysis = null;
 
     this.cacheDom();
     this.buildPendulumControls();
-    this.bindGlobalControls();
+    this.bindControls();
     this.recompute();
-    // Launch from the resting position now that the equilibrium is known.
     this.fullReset();
 
     this.reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (this.reducedMotion) {
-      this.playing = false;
-      this.dom.playToggle.textContent = 'Play';
-      this.dom.playToggle.setAttribute('aria-pressed', 'false');
-    }
+    if (this.reducedMotion) this.setPlaying(false);
 
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
@@ -1185,12 +1238,24 @@ class App {
       resetBtn: id('reset-btn'),
       defaultsBtn: id('defaults-btn'),
       nudgeBtn: id('nudge-btn'),
+      makeEqualBtn: id('make-equal-btn'),
+      mismatchBtn: id('mismatch-btn'),
+      presetButtons: Array.from(document.querySelectorAll('[data-preset]')),
+      viewButtons: Array.from(document.querySelectorAll('[data-view]')),
       inputTheta0: id('input-theta0'), valTheta0: id('val-theta0'),
       inputOmega0: id('input-omega0'), valOmega0: id('val-omega0'),
       initialPending: id('initial-pending'),
       clock: id('clock-readout'),
       energy: id('energy-readout'),
+      energyDetail: id('energy-detail'),
+      energyCheck: id('energy-check'),
       validation: id('validation'),
+      readoutG: id('readout-G'), readoutGNote: id('readout-G-note'),
+      readoutFreq: id('readout-freq'), readoutFreqNote: id('readout-freq-note'),
+      readoutError: id('readout-error'), readoutErrorNote: id('readout-error-note'),
+      compareReadout: id('compare-readout'),
+      compareNote: id('compare-note'),
+      springDetails: id('spring-view'),
       analogTable: document.querySelector('#analog-table tbody'),
       analogNote: id('analog-note'),
       analogMirror: id('analog-mirror'),
@@ -1215,8 +1280,6 @@ class App {
   buildPendulumControls() {
     const host = this.dom.pendulumControls;
     host.innerHTML = '';
-    // Initial conditions moved to their own global card, so a pendulum card
-    // now carries only the properties that take effect immediately.
     const keys = Object.keys(LIMITS);
 
     for (let i = 0; i < this.params.N; i++) {
@@ -1224,7 +1287,7 @@ class App {
       card.className = 'control-card';
       card.style.setProperty('--accent', ACCENTS[i % ACCENTS.length]);
 
-      const heading = document.createElement('h3');
+      const heading = document.createElement('h4');
       heading.innerHTML = `<span class="dot" aria-hidden="true"></span>Pendulum ${i + 1}`;
       card.appendChild(heading);
 
@@ -1267,7 +1330,7 @@ class App {
     }
   }
 
-  bindGlobalControls() {
+  bindControls() {
     const { dom } = this;
 
     dom.inputN.addEventListener('input', () => {
@@ -1292,11 +1355,9 @@ class App {
     bindScalar(dom.inputG, dom.valG, 'g', (v) => `${v.toFixed(2)} m/s²`);
     bindScalar(dom.inputD, dom.valD, 'd', (v) => `${v.toFixed(3)} m`);
     bindScalar(dom.inputB, dom.valB, 'damping', (v) => `${v.toFixed(3)} s⁻¹`);
-    bindScalar(dom.inputAlpha, dom.valAlpha, 'alpha', (v) => `${v.toFixed(1)}°`);
+    bindScalar(dom.inputAlpha, dom.valAlpha, 'alpha', fmtAngle);
 
-    // Initial conditions are deliberately inert while the simulation runs —
-    // they describe how the NEXT run starts, so the slider marks itself
-    // pending instead of yanking the bob mid-swing.
+    // Initial conditions describe the NEXT run, so they only mark themselves pending.
     const bindInitial = (input, readout, key, format) => {
       input.addEventListener('input', () => {
         this.params[key] = Number(input.value);
@@ -1304,15 +1365,10 @@ class App {
         this.setInitialsPending(true);
       });
     };
-    bindInitial(dom.inputTheta0, dom.valTheta0, 'theta0', (v) => `${v.toFixed(2)} rad`);
-    bindInitial(dom.inputOmega0, dom.valOmega0, 'omega0', (v) => `${v.toFixed(2)} rad/s`);
+    bindInitial(dom.inputTheta0, dom.valTheta0, 'theta0', fmtRad);
+    bindInitial(dom.inputOmega0, dom.valOmega0, 'omega0', fmtRate);
 
-    dom.playToggle.addEventListener('click', () => {
-      this.playing = !this.playing;
-      dom.playToggle.textContent = this.playing ? 'Pause' : 'Play';
-      dom.playToggle.setAttribute('aria-pressed', String(this.playing));
-    });
-
+    dom.playToggle.addEventListener('click', () => this.setPlaying(!this.playing));
     dom.resetBtn.addEventListener('click', () => this.fullReset());
 
     dom.defaultsBtn.addEventListener('click', () => {
@@ -1328,13 +1384,70 @@ class App {
     dom.nudgeBtn.addEventListener('click', () => {
       this.modeIndex = null;
       this.system.omega[0] += 1.2;
+      this.linear.etaDot[0] += 1.2;
+      this.rebaseEnergy();
       this.updateModeStatus();
     });
 
     dom.freeMotionBtn.addEventListener('click', () => {
       this.modeIndex = null;
       this.updateModeStatus();
+      this.renderModeTable();
     });
+
+    dom.presetButtons.forEach((button) => {
+      button.addEventListener('click', () => this.applyPreset(button.dataset.preset));
+    });
+
+    dom.viewButtons.forEach((button) => {
+      button.addEventListener('click', () => this.setViewMode(button.dataset.view));
+    });
+
+    dom.makeEqualBtn.addEventListener('click', () => {
+      const p = this.params;
+      for (let i = 1; i < p.m.length; i++) {
+        p.m[i] = p.m[0];
+        p.mu[i] = p.mu[0];
+      }
+      this.buildPendulumControls();
+      this.recompute();
+    });
+
+    dom.mismatchBtn.addEventListener('click', () => {
+      const p = this.params;
+      const clampTo = (v, spec) => clamp(Math.round(v / spec.step) * spec.step, spec.min, spec.max);
+      for (let i = 0; i < p.m.length; i++) {
+        p.m[i] = clampTo(p.m[0] * (1 + MISMATCH_MASS[i]), LIMITS.m);
+        p.mu[i] = clampTo(p.mu[0] * (1 + MISMATCH_MU[i]), LIMITS.mu);
+      }
+      this.buildPendulumControls();
+      this.recompute();
+    });
+  }
+
+  setPlaying(playing) {
+    this.playing = playing;
+    this.dom.playToggle.textContent = playing ? 'Pause' : 'Play';
+    this.dom.playToggle.setAttribute('aria-pressed', String(playing));
+  }
+
+  setViewMode(mode) {
+    this.viewMode = mode === 'independent' ? 'independent' : 'mapped';
+    this.dom.viewButtons.forEach((button) => {
+      button.setAttribute('aria-pressed', String(button.dataset.view === this.viewMode));
+    });
+    this.renderCompareNote();
+    this.render();
+  }
+
+  applyPreset(key) {
+    const apply = PRESETS[key];
+    if (!apply) return;
+    apply(this.params);
+    this.system.equilibriumHint = null;
+    this.syncControlsFromParams();
+    this.buildPendulumControls();
+    this.fullReset();
   }
 
   setInitialsPending(pending) {
@@ -1343,9 +1456,9 @@ class App {
   }
 
   /**
-   * A complete restart: leave mode playback, clear the clock, re-solve the
-   * equilibrium, and relaunch from the current initial conditions. Parameters
-   * are untouched — "Restore defaults" is the button that resets those.
+   * Restart: leave mode playback, clear the clock, re-solve the resting state,
+   * and relaunch both the nonlinear and the independent linear run from the
+   * same displacement and velocity about that state. Parameters are untouched.
    */
   fullReset() {
     this.modeIndex = null;
@@ -1353,12 +1466,16 @@ class App {
     this.system.equilibriumHint = null;
     this.recompute();
     this.system.reset(this.analysis.equilibrium.theta);
+    this.linear.reset(this.system, this.analysis);
+    this.rebaseEnergy();
     this.setInitialsPending(false);
     this.updateModeStatus();
+    this.renderModeTable();
     this.render();
+    this.updateReadouts();
   }
 
-  /** Push params back into every slider — used after Restore defaults. */
+  /** Push params back into every slider — used after presets and Restore defaults. */
   syncControlsFromParams() {
     const { dom, params } = this;
     const set = (input, readout, value, format) => {
@@ -1369,17 +1486,22 @@ class App {
     set(dom.inputL, dom.valL, params.L, (v) => `${v.toFixed(3)} m`);
     set(dom.inputG, dom.valG, params.g, (v) => `${v.toFixed(2)} m/s²`);
     set(dom.inputD, dom.valD, params.d, (v) => `${v.toFixed(3)} m`);
-    set(dom.inputAlpha, dom.valAlpha, params.alpha, (v) => `${v.toFixed(1)}°`);
+    set(dom.inputAlpha, dom.valAlpha, params.alpha, fmtAngle);
     set(dom.inputB, dom.valB, params.damping, (v) => `${v.toFixed(3)} s⁻¹`);
-    set(dom.inputTheta0, dom.valTheta0, params.theta0, (v) => `${v.toFixed(2)} rad`);
-    set(dom.inputOmega0, dom.valOmega0, params.omega0, (v) => `${v.toFixed(2)} rad/s`);
+    set(dom.inputTheta0, dom.valTheta0, params.theta0, fmtRad);
+    set(dom.inputOmega0, dom.valOmega0, params.omega0, fmtRate);
+  }
+
+  /** Energy baseline for the drift readout: excitation energy above the resting state. */
+  rebaseEnergy() {
+    this.energyBase = this.system.excitationEnergy(this.analysis.equilibrium.theta);
+    this.energyMaxDrift = 0;
   }
 
   recompute() {
     this.system.params = this.params;
     const N = this.params.N;
 
-    // Keep the live state the right length if N changed.
     while (this.system.theta.length < N) {
       this.system.theta.push(0);
       this.system.omega.push(0);
@@ -1387,10 +1509,15 @@ class App {
     this.system.theta.length = N;
     this.system.omega.length = N;
 
+    const previousEq = this.analysis ? this.analysis.equilibrium.theta.slice() : null;
     this.analysis = this.analyzer.analyze(this.system);
-    // Warm start the next Newton solve from the current answer.
     this.system.equilibriumHint = this.analysis.equilibrium.theta.slice();
     this.derived = this.springs.derived(this.system, this.analysis);
+
+    // A parameter edit moves the resting state; keep the linear run on the same
+    // absolute angles and re-baseline the energy drift.
+    if (previousEq) this.linear.rebase(previousEq, this.analysis.equilibrium.theta);
+    this.rebaseEnergy();
 
     if (this.modeIndex !== null && this.modeIndex >= this.analysis.modes.length) {
       this.modeIndex = null;
@@ -1400,53 +1527,128 @@ class App {
     this.renderMatrices();
     this.renderModeTable();
     this.renderMirrors();
-    this.checkValidity();
+    this.buildStaticWarnings();
+    this.renderCompareNote();
     this.updateModeStatus();
+    this.updateReadouts();
   }
 
-  checkValidity() {
-    const messages = [];
+  /** Warnings that depend only on parameters, grouped by category. */
+  buildStaticWarnings() {
+    const list = [];
     const { modes, equilibrium } = this.analysis;
+    const { analytic } = this.analysis;
+    const G = geometryFactor(this.params.alpha);
     const unstable = modes.filter((m) => !m.stable);
 
     if (unstable.length > 0) {
-      messages.push(
-        `${unstable.length} mode${unstable.length > 1 ? 's have' : ' has'} λ ≤ 0. ` +
-        'The magnets overpower gravity along that pattern, so the equilibrium is unstable and the ' +
-        'motion grows rather than oscillates. Reduce μ, increase d, or move α toward the magic angle.'
-      );
+      list.push({
+        cat: 'physical',
+        text:
+          `${unstable.length} linear mode${unstable.length > 1 ? 's have' : ' has'} λ ≤ 0. ` +
+          'The magnets overpower gravity along that pattern, so the resting state is unstable. ' +
+          'Reduce μ, increase d, or move α toward the magic angle.'
+      });
     }
-    if (!equilibrium.converged) {
-      messages.push(
-        'The equilibrium solver did not fully converge — the magnets are strong enough that the ' +
-        'cradle has no nearby resting state. Readings below are indicative only.'
-      );
+    if (G < -0.02) {
+      list.push({
+        cat: 'physical',
+        text: 'Attractive coupling (G < 0): the anti-phase mode is the soft one and the resting state is pulled together.'
+      });
     }
-    if (this.system.contactHit) {
-      messages.push(
-        'Two bobs are passing within a few magnet-widths of each other, where the point-dipole ' +
-        'picture stops being a good description of real magnets. The softened interaction keeps ' +
-        'the simulation well behaved, but treat that regime as qualitative.'
-      );
-    }
-    if (this.analysis.analytic.applicable && !this.analysis.analytic.symmetric) {
-      messages.push(
-        'α is oblique, so the dipoles break the row\'s left–right mirror symmetry and add a ' +
-        'diagonal tilt term the uniform-chain formula cannot represent. The closed-form column ' +
-        'below is exact only at α = 0° or 90°.'
-      );
-    }
-    const G = geometryFactor(this.params.alpha);
     if (Math.abs(G) < 0.02) {
-      messages.push(
-        `α is at the magic angle (${MAGIC_ANGLE_DEG.toFixed(2)}°) where G(α) = 1 − 3cos²α = 0. ` +
-        'The dipoles decouple however strong they are, and every mode collapses to √(g/L). ' +
-        '(Exactly so for point dipoles; finite magnet size leaves a residue near 0.01%.)'
-      );
+      list.push({
+        cat: 'physical',
+        text:
+          `Point-dipole coupling vanishes at the magic angle (${MAGIC_ANGLE_DEG.toFixed(2)}°). ` +
+          'With the current finite-size regularization, the residual is small but not identically zero.'
+      });
     }
 
-    this.dom.validation.hidden = messages.length === 0;
-    this.dom.validation.innerHTML = messages.map((m) => `<span>${m}</span>`).join('');
+    if (!analytic.applicable) {
+      list.push({
+        cat: 'linear',
+        text: 'Unequal masses or moments: the closed-form comparison does not apply; use the numerical modes.'
+      });
+    } else if (!analytic.symmetric) {
+      list.push({
+        cat: 'linear',
+        text:
+          'Oblique orientation adds a diagonal tilt term that the closed form omits; ' +
+          'the closed-form column is an approximation here.'
+      });
+    }
+
+    if (!equilibrium.converged) {
+      list.push({
+        cat: 'numerical',
+        text:
+          'The resting-state solver did not converge, so no nearby resting state was found. ' +
+          'Mode results are indicative only.'
+      });
+    }
+    this.staticWarnings = list;
+    this.updateWarnings();
+  }
+
+  /** Static warnings plus those that depend on the running state. */
+  updateWarnings() {
+    const list = this.staticWarnings.slice();
+    const { params, analysis } = this;
+
+    let maxEta = 0;
+    for (let i = 0; i < params.N; i++) {
+      maxEta = Math.max(maxEta, Math.abs(this.system.theta[i] - analysis.equilibrium.theta[i]));
+    }
+    if (maxEta > LARGE_AMPLITUDE_RAD) {
+      list.push({
+        cat: 'linear',
+        text:
+          `Displacements reach ${((maxEta * 180) / Math.PI).toFixed(0)}° from rest; the small-angle ` +
+          'approximation is expected to degrade at this amplitude.'
+      });
+    }
+
+    const error = this.linearError();
+    if (error && error.relative > LINEAR_ERROR_THRESHOLD) {
+      list.push({
+        cat: 'linear',
+        text:
+          `The independent linear run differs from the nonlinear motion by ${(error.relative * 100).toFixed(0)}% ` +
+          `(RMS), above the ${LINEAR_ERROR_THRESHOLD * 100}% threshold.`
+      });
+    }
+
+    if (this.system.contactHit) {
+      list.push({
+        cat: 'numerical',
+        text:
+          'Two bobs are within about three softening lengths of each other, where the regularization ' +
+          'dominates the interaction. Treat this regime as qualitative.'
+      });
+    }
+
+    const labels = { physical: 'Physical regime', linear: 'Linear-model limit', numerical: 'Model / numerical limit' };
+    const order = ['physical', 'linear', 'numerical'];
+    list.sort((a, b) => order.indexOf(a.cat) - order.indexOf(b.cat));
+    const html = list
+      .map((w) => `<span class="msg msg-${w.cat}"><strong>${labels[w.cat]}</strong> ${w.text}</span>`)
+      .join('');
+    if (html === this.warningKey) return;
+    this.warningKey = html;
+    this.dom.validation.hidden = list.length === 0;
+    this.dom.validation.innerHTML = html;
+  }
+
+  /** RMS coordinate difference between the nonlinear state and the independent linear run. */
+  linearError() {
+    const { L } = this.params;
+    const mapped = this.system.theta.map((t, i) => L * (t - this.analysis.equilibrium.theta[i]));
+    const linear = this.linear.coordinates(L);
+    const rms = rmsDifference(mapped, linear);
+    if (!Number.isFinite(rms)) return null;
+    const scale = Math.sqrt(mapped.reduce((s, v) => s + v * v, 0) / mapped.length);
+    return { rms, relative: scale > 1e-4 ? rms / scale : 0, scale };
   }
 
   renderAnalogTable() {
@@ -1478,7 +1680,7 @@ class App {
       ['Length <em>L</em>', `${p.L.toFixed(3)} m`],
       ['Gravity <em>g</em>', `${p.g.toFixed(2)} m/s²`],
       ['Separation <em>d</em>', `${p.d.toFixed(3)} m`],
-      ['Orientation <em>α</em>', `${p.alpha.toFixed(1)}°`],
+      ['Orientation <em>α</em>', `${p.alpha.toFixed(2)}°`],
       ['<em>G</em>(α) = 1 − 3cos²α', G.toFixed(4)],
       ['Damping <em>b</em>', `${p.damping.toFixed(3)} s⁻¹`],
       ['κ (adjacent, at rest)', `${kappa.toExponential(3)} N·m/rad`],
@@ -1489,19 +1691,17 @@ class App {
     this.dom.analogMirror.innerHTML = html;
     if (this.dom.theoryMirror) this.dom.theoryMirror.innerHTML = html;
 
-    const eq = this.analysis.equilibrium;
-    this.dom.equilibriumReadout.innerHTML = eq.theta
-      .map((t, i) => `<span class="chip" style="--accent:${ACCENTS[i % ACCENTS.length]}">θ*<sub>${i + 1}</sub> = ${(t * 180 / Math.PI).toFixed(3)}°</span>`)
+    this.dom.equilibriumReadout.innerHTML = eqTheta
+      .map((t, i) => `<span class="chip" style="--accent:${ACCENTS[i % ACCENTS.length]}">θ*<sub>${i + 1}</sub> = ${((t * 180) / Math.PI).toFixed(2)}°</span>`)
       .join('');
 
-    const magic = Math.abs(G) < 0.02;
     this.dom.geometryReadout.innerHTML =
       `<strong>G(α) = ${G.toFixed(4)}</strong> — ` +
-      (magic
-        ? 'the magic angle: the dipoles decouple completely.'
+      (Math.abs(G) < 0.02
+        ? 'the magic angle: point-dipole coupling vanishes.'
         : G < 0
-          ? 'negative, so the magnets attract along the row and the coupling springs are inverted; the anti-phase mode is the soft one.'
-          : 'positive, so the magnets repel; the coupling behaves like ordinary springs and the in-phase mode is the soft one.');
+          ? 'negative: the magnets attract along the row, the coupling springs are inverted, and the anti-phase mode is the soft one.'
+          : 'positive: the magnets repel, the coupling acts like ordinary springs, and the in-phase mode is the soft one.');
   }
 
   renderMatrices() {
@@ -1555,22 +1755,33 @@ class App {
             <td>${mode.stable ? mode.period.toFixed(3) : '—'}</td>
             <td class="components">${components}</td>
             <td class="character">${mode.description}</td>
-            <td><button class="btn btn-small" data-play-mode="${k}" ${mode.stable ? '' : 'disabled'}>Play</button></td>
+            <td><button class="btn btn-small" type="button" data-play-mode="${k}" ${mode.stable ? '' : 'disabled'}>Play</button></td>
           </tr>`;
       })
       .join('');
 
     this.dom.modeTable.querySelectorAll('[data-play-mode]').forEach((button) => {
-      button.addEventListener('click', () => {
-        this.modeIndex = Number(button.dataset.playMode);
-        this.modeTime = 0;
-        this.playing = true;
-        this.dom.playToggle.textContent = 'Pause';
-        this.dom.playToggle.setAttribute('aria-pressed', 'true');
-        this.updateModeStatus();
-        this.renderModeTable();
-      });
+      button.addEventListener('click', () => this.startMode(Number(button.dataset.playMode)));
     });
+  }
+
+  /** Begin pure-mode playback: seat the nonlinear display and the linear run on the mode's initial state. */
+  startMode(index) {
+    const mode = this.analysis.modes[index];
+    if (!mode || !mode.stable) return;
+    this.modeIndex = index;
+    this.modeTime = 0;
+    const eq = this.analysis.equilibrium.theta;
+    for (let i = 0; i < this.params.N; i++) {
+      this.system.theta[i] = eq[i] + this.modeAmplitude * mode.vecDisplay[i];
+      this.system.omega[i] = 0;
+      this.linear.eta[i] = this.modeAmplitude * mode.vecDisplay[i];
+      this.linear.etaDot[i] = 0;
+    }
+    this.rebaseEnergy();
+    this.setPlaying(true);
+    this.updateModeStatus();
+    this.renderModeTable();
   }
 
   updateModeStatus() {
@@ -1581,7 +1792,19 @@ class App {
     }
     const mode = this.analysis.modes[this.modeIndex];
     this.dom.modeStatus.textContent =
-      `Driving pure mode ${this.modeIndex + 1} at ω = ${mode.omega.toFixed(4)} rad/s — the shape is frozen and only the amplitude breathes.`;
+      `Pure mode ${this.modeIndex + 1} at ω = ${mode.omega.toFixed(4)} rad/s: the analytic solution of the ` +
+      'linearized system, not of the full nonlinear cradle except at small amplitude.';
+  }
+
+  renderCompareNote() {
+    if (!this.dom.compareNote) return;
+    this.dom.compareNote.innerHTML =
+      this.viewMode === 'mapped'
+        ? '<strong>Coordinate map of the nonlinear state — not an independent simulation.</strong> ' +
+          'The right panel shows x<sub>i</sub> = L(θ<sub>i</sub> − θ*<sub>i</sub>) of the left panel. ' +
+          'The independent run below still integrates in the background.'
+        : '<strong>Independent linear model.</strong> The right panel integrates ' +
+          'M η̈ + K η = 0 (with the same damping) from the reset state, without reading the nonlinear cradle again.';
   }
 
   renderDecomposition() {
@@ -1596,19 +1819,80 @@ class App {
       .join('');
   }
 
-  /** Pure-mode playback: an exact solution of the linearized system, so it is
-   *  driven analytically about the equilibrium rather than integrated. */
+  /** Pure-mode playback: analytic damped solution of the linearized system about the resting state. */
   driveMode(dt) {
     const mode = this.analysis.modes[this.modeIndex];
     if (!mode || !mode.stable) return;
     this.modeTime += dt;
-    const phase = mode.omega * this.modeTime;
+    const { position, velocity } = modeEnvelope(mode.lambda, this.params.damping, this.modeTime);
     const eq = this.analysis.equilibrium.theta;
     for (let i = 0; i < this.params.N; i++) {
-      this.system.theta[i] = eq[i] + this.modeAmplitude * mode.vecDisplay[i] * Math.cos(phase);
-      this.system.omega[i] = -this.modeAmplitude * mode.vecDisplay[i] * mode.omega * Math.sin(phase);
+      this.system.theta[i] = eq[i] + this.modeAmplitude * mode.vecDisplay[i] * position;
+      this.system.omega[i] = this.modeAmplitude * mode.vecDisplay[i] * velocity;
     }
     this.system.time += dt;
+  }
+
+  /** Slow readouts, refreshed a few times per second. */
+  updateReadouts() {
+    const { dom, params, analysis, system } = this;
+    const G = geometryFactor(params.alpha);
+
+    dom.clock.textContent = `t = ${system.time.toFixed(2)} s`;
+
+    // Energy
+    const E = system.excitationEnergy(analysis.equilibrium.theta);
+    dom.energy.textContent = `Mechanical energy: ${E.toFixed(5)} J`;
+    const pure = this.modeIndex !== null;
+    const measurable = this.energyBase > 1e-9;
+    const change = measurable ? ((E - this.energyBase) / this.energyBase) * 100 : NaN;
+    const changeText = Number.isFinite(change)
+      ? `${change >= 0 ? '+' : '−'}${Math.abs(change).toFixed(2)} %`
+      : '—';
+    const note = params.damping > 0
+      ? 'Expected to decrease: viscous damping is active.'
+      : 'Numerical diagnostic: monitor drift; RK4 is not symplectic.';
+    dom.energyDetail.textContent =
+      `Energy above the resting state; change since reset: ${changeText}. ${pure ? 'Pure-mode playback is analytic, so this is not an integration diagnostic.' : note}`;
+
+    if (params.damping === 0 && !system.contactHit && !pure && this.playing && measurable) {
+      this.energyMaxDrift = Math.max(this.energyMaxDrift, Math.abs(change));
+    }
+    if (dom.energyCheck) {
+      dom.energyCheck.textContent =
+        params.damping === 0 && !system.contactHit && !pure
+          ? `Maximum sampled drift since reset: ${this.energyMaxDrift.toFixed(4)} % (undamped, no close-approach warning).`
+          : 'Applies only to undamped runs with no close-approach warning and no pure-mode playback.';
+    }
+
+    // Headline readouts
+    dom.readoutG.textContent = (Math.abs(G) < 5e-4 ? 0 : G).toFixed(3);
+    dom.readoutGNote.textContent =
+      Math.abs(G) < 0.02 ? 'decoupled (point dipole)' : G < 0 ? 'attractive' : 'repulsive';
+
+    const stable = analysis.modes.find((m) => m.stable);
+    const free = Math.sqrt(params.g / params.L);
+    if (stable) {
+      dom.readoutFreq.textContent = `${stable.omega.toFixed(3)} rad/s`;
+      const unstableCount = analysis.modes.filter((m) => !m.stable).length;
+      dom.readoutFreqNote.textContent =
+        `uncoupled √(g/L) = ${free.toFixed(3)}` + (unstableCount ? ` · ${unstableCount} unstable` : '');
+    } else {
+      dom.readoutFreq.textContent = 'none stable';
+      dom.readoutFreqNote.textContent = `uncoupled √(g/L) = ${free.toFixed(3)} rad/s`;
+    }
+
+    const error = this.linearError();
+    const errText = error ? `${(error.rms * 1000).toFixed(2)} mm` : '—';
+    dom.readoutError.textContent = errText;
+    dom.readoutErrorNote.textContent = error && error.scale > 1e-4
+      ? `RMS, ${(error.relative * 100).toFixed(1)}% of displacement`
+      : 'RMS, independent run';
+    dom.compareReadout.textContent = error
+      ? `RMS difference ${errText} · elapsed ${system.time.toFixed(2)} s`
+      : 'RMS difference —';
+
+    this.updateWarnings();
   }
 
   loop(now) {
@@ -1621,6 +1905,7 @@ class App {
     if (this.playing) {
       if (this.modeIndex !== null) this.driveMode(dt);
       else this.system.advance(dt);
+      this.linear.advance(dt, this.analysis, this.params.damping);
     }
 
     this.render();
@@ -1628,31 +1913,38 @@ class App {
     this.uiClock += dt;
     if (this.uiClock > 0.12) {
       this.uiClock = 0;
-      this.dom.clock.textContent = `t = ${this.system.time.toFixed(2)} s`;
-      this.dom.energy.textContent = `E = ${this.system.energy().toFixed(5)} J`;
+      this.updateReadouts();
       this.renderDecomposition();
     }
   }
 
+  /** Spring-coordinate source for the right-hand views, per the view mode. */
+  springSource() {
+    if (this.viewMode === 'independent') return { x: this.linear.coordinates(this.params.L) };
+    return this.springs;
+  }
+
   render() {
     this.springs.sampleFrom(this.system, this.analysis);
+    const source = this.springSource();
 
     const cradle = syncCanvas(this.canvases.cradle);
     fillBackground(cradle.ctx, cradle.w, cradle.h);
     drawCradle(cradle.ctx, this.system, this.analysis, { x: 0, y: 0, w: cradle.w, h: cradle.h });
 
-    const spring = syncCanvas(this.canvases.spring);
-    fillBackground(spring.ctx, spring.w, spring.h);
-    drawSprings(spring.ctx, this.springs, this.system, this.derived, { x: 0, y: 0, w: spring.w, h: spring.h });
+    if (this.dom.springDetails.open) {
+      const spring = syncCanvas(this.canvases.spring);
+      fillBackground(spring.ctx, spring.w, spring.h);
+      drawSprings(spring.ctx, source, this.system, this.derived, { x: 0, y: 0, w: spring.w, h: spring.h });
+    }
 
-    // Side-by-side comparison.
     const compare = syncCanvas(this.canvases.compare);
     fillBackground(compare.ctx, compare.w, compare.h);
     const half = compare.w / 2;
     const top = 26;
     drawCradle(compare.ctx, this.system, this.analysis,
       { x: 0, y: top, w: half, h: compare.h - top }, { compact: true });
-    drawSprings(compare.ctx, this.springs, this.system, this.derived,
+    drawSprings(compare.ctx, source, this.system, this.derived,
       { x: half, y: top, w: half, h: compare.h - top }, { compact: true });
 
     const c = compare.ctx;
@@ -1665,18 +1957,158 @@ class App {
     c.stroke();
     c.restore();
 
-    captionText(c, 'NONLINEAR CRADLE', 16, 18, hexToRgba(PALETTE.gold, 0.85), 10);
-    captionText(c, 'LINEARIZED SPRING–MASS ANALOG', half + 16, 18, hexToRgba(PALETTE.blue, 0.85), 10);
+    const narrow = compare.w < 480;
+    captionText(c, narrow ? 'NONLINEAR' : 'NONLINEAR CRADLE', 16, 18, hexToRgba(PALETTE.gold, 0.85), 10);
+    const right = this.viewMode === 'independent'
+      ? (narrow ? 'INDEPENDENT LINEAR' : 'INDEPENDENT LINEAR MODEL')
+      : (narrow ? 'MAPPED COORDINATES' : 'MAPPED NONLINEAR COORDINATES');
+    captionText(c, right, half + 16, 18, hexToRgba(PALETTE.blue, 0.85), 10);
   }
 }
 
-/* ---------------------------------------------------------------------------
- * Boot
- * ------------------------------------------------------------------------- */
+// -----------------------------------------------------------------------------
+// Diagnostics
+//
+// Console-callable regression checks: cradleDiagnostics(). Each result reports
+// the measured value against a stated tolerance; nothing here is shown as
+// "verified" in the UI.
+// -----------------------------------------------------------------------------
+
+function runDiagnostics() {
+  const results = [];
+  const check = (name, value, tolerance) => {
+    results.push({ name, value, tolerance, pass: Number.isFinite(value) && value <= tolerance });
+  };
+  const make = (over = {}) => new MagneticCradle({ ...defaultParams(), ...over });
+  const maxAbs = (arr) => arr.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
+
+  // 1. Zero dipole moment reduces to independent pendulums.
+  {
+    const sys = make({ mu: [0, 0, 0, 0, 0] });
+    const theta = [0.3, -0.2, 0.1];
+    const { L, m, g } = sys.params;
+    const torque = sys.staticTorques(theta);
+    const err = theta.map((t, i) => torque[i] + m[i] * g * L * Math.sin(t));
+    check('zero moment: torque = −m g L sin θ (abs error, N·m)', maxAbs(err), 1e-12);
+  }
+
+  // 2. Magic angle: off-diagonal stiffness relative to the α = 90° value.
+  {
+    const off = (alpha) => Math.abs(make({ alpha }).stiffness([0, 0, 0], { raw: true })[0][1]);
+    check('magic angle: |K01(54.74°)| / |K01(90°)|', off(MAGIC_ANGLE_DEG) / off(90), 5e-3);
+  }
+
+  // 3. Raw finite-difference stiffness matrix is symmetric (oblique α, at rest).
+  {
+    const sys = make({ alpha: 60 });
+    const eq = sys.findEquilibrium().theta;
+    const K = sys.stiffness(eq, { raw: true });
+    let asym = 0;
+    let scale = 0;
+    for (let i = 0; i < K.length; i++) {
+      for (let j = 0; j < K.length; j++) {
+        asym = Math.max(asym, Math.abs(K[i][j] - K[j][i]));
+        scale = Math.max(scale, Math.abs(K[i][j]));
+      }
+    }
+    check('stiffness symmetry: max |Kij − Kji| / max |K|', asym / scale, 1e-6);
+  }
+
+  // 4. Modes are mass-orthonormal.
+  {
+    const sys = make({ alpha: 30, mu: [5, 4, 6, 5, 5], m: [0.18, 0.2, 0.15, 0.18, 0.18] });
+    const analysis = new NormalModeAnalyzer().analyze(sys);
+    let worst = 0;
+    analysis.modes.forEach((a, k) => {
+      analysis.modes.forEach((b, l) => {
+        let dot = 0;
+        for (let i = 0; i < analysis.massDiag.length; i++) dot += a.vecM[i] * analysis.massDiag[i] * b.vecM[i];
+        worst = Math.max(worst, Math.abs(dot - (k === l ? 1 : 0)));
+      });
+    });
+    check('mode M-orthonormality: max |vkᵀ M vl − δkl|', worst, 1e-9);
+  }
+
+  // 5. Torques are the gradient of the regularized energy.
+  {
+    const sys = make({ alpha: 35 });
+    const theta = [0.12, -0.05, 0.2];
+    const torque = sys.magneticTorques(theta);
+    const h = 1e-6;
+    const err = theta.map((_, i) => {
+      const plus = theta.slice();
+      const minus = theta.slice();
+      plus[i] += h;
+      minus[i] -= h;
+      const numeric = -(sys.magneticEnergy(plus) - sys.magneticEnergy(minus)) / (2 * h);
+      return torque[i] - numeric;
+    });
+    check('torque vs −dE/dθ (central difference): max error / max |τ|', maxAbs(err) / maxAbs(torque), 1e-6);
+  }
+
+  // 6. Independent linear run against the analytic mode solution.
+  [0, 0.1].forEach((damping) => {
+    const sys = make({ damping, theta0: 0 });
+    const analysis = new NormalModeAnalyzer().analyze(sys);
+    const mode = analysis.modes.find((m) => m.stable);
+    const amp = 1e-3;
+    const linear = new LinearModel();
+    linear.eta = mode.vecDisplay.map((v) => amp * v);
+    linear.etaDot = linear.eta.map(() => 0);
+    let worst = 0;
+    const dt = 1 / 60;
+    const steps = Math.ceil((3 * mode.period) / dt);
+    for (let s = 1; s <= steps; s++) {
+      linear.advance(dt, analysis, damping);
+      const { position } = modeEnvelope(mode.lambda, damping, s * dt);
+      linear.eta.forEach((e, i) => {
+        worst = Math.max(worst, Math.abs(e - amp * mode.vecDisplay[i] * position));
+      });
+    }
+    check(`linear model vs analytic mode, b = ${damping}: max error / amplitude`, worst / amp, 1e-6);
+  });
+
+  // 7. Undamped small-amplitude energy drift over 20 s.
+  {
+    const sys = make({ damping: 0, theta0: 0.05 });
+    const analysis = new NormalModeAnalyzer().analyze(sys);
+    sys.reset(analysis.equilibrium.theta);
+    const e0 = sys.excitationEnergy(analysis.equilibrium.theta);
+    let drift = 0;
+    for (let s = 0; s < 1200; s++) {
+      sys.advance(1 / 60);
+      drift = Math.max(drift, Math.abs(sys.excitationEnergy(analysis.equilibrium.theta) - e0) / e0);
+    }
+    check('undamped θ₀ = 0.05 rad, 20 s: max relative energy drift', drift, 1e-6);
+  }
+
+  // 8. Small-amplitude agreement between the nonlinear and linear runs over 5 s.
+  {
+    const sys = make({ damping: 0.02, theta0: 0.01 });
+    const analysis = new NormalModeAnalyzer().analyze(sys);
+    sys.reset(analysis.equilibrium.theta);
+    const linear = new LinearModel();
+    linear.reset(sys, analysis);
+    let worst = 0;
+    for (let s = 0; s < 300; s++) {
+      sys.advance(1 / 60);
+      linear.advance(1 / 60, analysis, sys.params.damping);
+      const mapped = sys.theta.map((t, i) => t - analysis.equilibrium.theta[i]);
+      worst = Math.max(worst, rmsDifference(mapped, linear.eta) / 0.01);
+    }
+    check('θ₀ = 0.01 rad, 5 s: RMS(nonlinear − linear) / θ₀', worst, 1e-2);
+  }
+
+  if (typeof console !== 'undefined' && console.table) console.table(results);
+  return results;
+}
+
+// -----------------------------------------------------------------------------
+// Boot
+// -----------------------------------------------------------------------------
 
 function renderMath() {
-  // KaTeX is loaded from a CDN; if it is unavailable the raw TeX stays
-  // readable rather than the page breaking.
+  // KaTeX loads from a CDN; without it the raw TeX stays readable.
   if (typeof window.renderMathInElement !== 'function') {
     document.body.classList.add('katex-missing');
     return;
@@ -1691,6 +2123,8 @@ function renderMath() {
     throwOnError: false
   });
 }
+
+window.cradleDiagnostics = runDiagnostics;
 
 document.addEventListener('DOMContentLoaded', () => {
   renderMath();

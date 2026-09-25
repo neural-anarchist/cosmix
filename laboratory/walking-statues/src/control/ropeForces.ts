@@ -19,7 +19,7 @@ import type { RopeSolution } from "./ropeModel";
  * hold — about 92x the statue's weight — and moved it 1.4 km. It presented as
  * "a below-threshold force still rotates the statue", which looks like a
  * contact or friction problem and is not one. Full measurements and derivation
- * in PHASE1_FORCE_CONTACT_AUDIT.md §3.
+ * in docs/decisions/ADR-001-force-and-torque-reset.md.
  *
  * Both resets are required, not just `resetForces`: Rapier documents that one
  * as resetting "the user forces (but not torques)", and `addForceAtPoint`

@@ -376,7 +376,7 @@ renderer.setAnimationLoop(animate);
 // ------------------------------------------------------------
 // Reveal once the first frame is on screen.
 // ------------------------------------------------------------
-const heroTypewriter = createHeroTypewriter();
+const heroTypewriter = createHeroTypewriter({ scene, camera, renderer });
 
 requestAnimationFrame(function () {
   requestAnimationFrame(function () {

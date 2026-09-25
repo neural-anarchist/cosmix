@@ -111,7 +111,7 @@ export interface StatueParams {
    * When true the derived mass properties are discarded and the center of mass
    * is placed explicitly at the three offsets below. Intended for abstract
    * geometry sweeps where COM is the independent variable; see
-   * PHASE2_GEOMETRY_AND_CONTROL.md for why the inertia tensor is retained from
+   * docs/archive/PHASE2_GEOMETRY_AND_CONTROL.md for why the inertia tensor is retained from
    * the derived configuration rather than also being invented.
    */
   comOverrideEnabled: boolean;

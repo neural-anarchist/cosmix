@@ -537,6 +537,11 @@ input[type="range"]::-moz-range-thumb {
 
 .prose {
   max-width: 72ch;
+  /* A grid item's default auto min-width is its content's min-content size,
+     which a non-wrapping KaTeX display equation (see .katex-display below)
+     can make very wide. Without this, that reintroduces the same overflow
+     the nested overflow-x:auto is meant to prevent. */
+  min-width: 0;
 }
 
 .prose h3 {
@@ -572,6 +577,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .katex-display {
+  max-width: 100%;
   margin: 1.1rem 0;
   overflow-x: auto;
   overflow-y: hidden;
@@ -580,6 +586,10 @@ input[type="range"]::-moz-range-thumb {
 .katex {
   color: var(--ink);
   font-size: 1.02em;
+}
+
+.ws-math {
+  max-width: 100%;
 }
 
 /* ---------- Basic/advanced toggle ---------- */
@@ -760,6 +770,46 @@ input[type="range"]::-moz-range-thumb {
 .diagnostics-regime strong {
   font-family: var(--mono);
   color: var(--gold);
+}
+
+.developer-tools {
+  margin-top: 2rem;
+}
+
+.diagnostics-nested {
+  margin-top: 1.25rem;
+  border-top: 1px solid var(--line);
+  padding-top: 0.9rem;
+}
+
+.diagnostics-nested > summary {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.diagnostics-nested > summary:hover {
+  color: var(--ink);
+}
+
+.diagnostics-nested-body {
+  margin-top: 0.9rem;
+}
+
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--blue);
+  font: inherit;
+  font-size: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  color: var(--ink);
 }
 
 .diag-grid {

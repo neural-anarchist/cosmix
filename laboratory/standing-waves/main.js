@@ -51,8 +51,8 @@ const SAMPLES = 240;            // sample points along the drawn string
 const MAX_MODES = 64;
 const A4 = 440;                 // Hz, concert pitch for the note-name readout
 
-/* Roughly the smallest pitch difference a careful listener resolves on a
-   sustained tone. Used only to word the insight card, never in the physics. */
+/* Reference for a small but potentially audible pitch difference on a
+   sustained tone. Used to label readouts and plots, not in the physics. */
 const AUDIBLE_CENTS = 5;
 
 const PALETTE = {
@@ -343,11 +343,11 @@ const STIFFNESS_PRESETS = {
 };
 
 const MODEL_BLURBS = {
-  ideal: 'The clamped string of the textbook: perfectly flexible, uniformly tensioned, and displaced so little that its length never changes. Two travelling waves run in opposite directions and add to a wave that goes nowhere.',
-  fret: 'Pressing the string to a fret does two things at once. It shortens the speaking length, which is exactly what equal-tempered fret placement intends, and it lengthens the string’s total path, which raises the tension and was not intended at all.',
-  stiff: 'A real wire resists bending as well as stretching. Higher partials are more sharply curved, so they pay more bending energy and run sharp — the overtones are no longer an exact harmonic series.',
-  pluck: 'A strongly displaced string is measurably longer than a straight one, so a hard pluck raises its own tension and its own pitch, then relaxes as the motion decays.',
-  all: 'Every correction applied together: the fretted length and tension, the stiffness-shifted partials, and the amplitude-dependent tension of the decaying pluck.'
+  ideal: "A flexible string with fixed ends supports standing waves. Its tension and length stay constant, so the harmonics fall at exact integer multiples of the fundamental.",
+  fret: "A fret sets a shorter vibrating length, but pressing the string down also lengthens its full path. That extra stretch raises the tension and pulls the note sharp.",
+  stiff: "A steel string resists bending. The sharper curvature of high partials costs extra energy, so their frequencies sit slightly above the harmonic series.",
+  pluck: "A displaced string is longer than a straight string. After release, its extra length and tension fade with the motion, producing a small downward pitch glide.",
+  all: "The fretted length sets the nominal note. Fretting, stiffness, and pluck amplitude then move the result in different ways."
 };
 
 /**
@@ -486,48 +486,49 @@ function evaluate(p) {
   return model;
 }
 
-/** Physical sanity checks on the described setup, surfaced to the reader. */
+/** Physical sanity checks on the described setup, shown above the readouts. */
 function collectWarnings(m) {
   const out = [];
   const line = m.fretting.line;
 
-  // Does the resting string actually clear every fret it passes over?
+  // Does the resting string clear every fret it passes over?
   let worst = Infinity;
   let worstFret = 0;
   for (let f = 1; f <= MAX_FRET; f++) {
     const gap = line.heightAt(fretOffset(m.scale, f)) - m.geometry.fretHeight;
     if (gap < worst) { worst = gap; worstFret = f; }
   }
-  if (worst <= 0) {
-    out.push(`This setup puts the resting string ${(Math.abs(worst) * 1000).toFixed(2)} mm below the crown of fret ${worstFret}. A real string would rest on the fret rather than vibrate over it — raise the nut or the action.`);
+  if (worst < 0) {
+    out.push(`The resting string intersects fret ${worstFret} by ${(Math.abs(worst) * 1000).toFixed(2)} mm. Raise the action or nut height before interpreting this setup.`);
+  } else if (worst === 0) {
+    out.push(`The resting string touches fret ${worstFret}. Raise the action or nut height before interpreting this setup.`);
   } else if (worst < 0.1e-3) {
-    out.push(`The resting string clears fret ${worstFret} by only ${(worst * 1000).toFixed(2)} mm, which a real string would buzz against.`);
+    out.push(`The resting string clears fret ${worstFret} by only ${(worst * 1000).toFixed(2)} mm and would likely buzz.`);
   }
 
   if (line.ySaddle > 8e-3) {
-    out.push(`The implied saddle height is ${(line.ySaddle * 1000).toFixed(1)} mm, well above a normal setup. The action or nut height is probably unrealistic for this scale length.`);
+    out.push(`The implied bridge height is ${(line.ySaddle * 1000).toFixed(1)} mm, well above a typical setup. Check the action and nut height.`);
   }
 
   if (m.fretting.path.pressOffsetClamped) {
-    out.push(`At fret ${m.fret}, the frets are ${(m.fretting.path.pressOffset * 1000).toFixed(1)} mm apart at most, so the finger contact has been capped at that distance behind the fret.`);
+    out.push(`At fret ${m.fret}, the finger position is limited to ${(m.fretting.path.pressOffset * 1000).toFixed(1)} mm behind the fret so that it stays between frets.`);
   }
 
   if (m.fretting.tensionRatio > 0.35) {
-    out.push(`The predicted tension rise is ${(m.fretting.tensionRatio * 100).toFixed(0)} % of the open tension. The linear elastic approximation dT = (EA/L₀)dL is only trustworthy for small fractional changes, so read this figure as an order of magnitude.`);
+    out.push(`ΔT is ${(m.fretting.tensionRatio * 100).toFixed(0)}% of T₀. The linear estimate ΔT = (EA/L₀)ΔL holds for small changes, so treat this value as an order of magnitude.`);
   }
 
-  // Music wire yields somewhere around 2–3 GPa; past that the string breaks
-  // rather than playing, which is worth saying out loud.
+  // Music wire breaks somewhere above 2–3 GPa.
   if (m.stress > 2.5e9) {
-    out.push(`The core stress is ${(m.stress / 1e9).toFixed(2)} GPa, above the tensile strength of ordinary music wire. A real string at these settings would break.`);
+    out.push(`The core stress is ${(m.stress / 1e9).toFixed(2)} GPa, above the strength of ordinary music wire. A real string at this tension would break.`);
   }
 
   if (m.stiff.B > 0.02) {
-    out.push(`The inharmonicity coefficient is B = ${m.stiff.B.toExponential(2)}. The expression f_n = n f₁√(1+Bn²) is derived for small B, so treat the high partials here as qualitative.`);
+    out.push(`B = ${m.stiff.B.toExponential(2)}. The formula f_n = n f₁√(1+Bn²) assumes small B, so the highest partials are only qualitative.`);
   }
 
   if (m.pluck.amplitude > 0.02 * m.length) {
-    out.push(`The pluck amplitude is ${(100 * m.pluck.amplitude / m.length).toFixed(1)} % of the string length. The small-slope extension integral starts to lose accuracy well before this becomes large.`);
+    out.push(`The pluck height is ${(100 * m.pluck.amplitude / m.length).toFixed(1)}% of the vibrating length. The small-slope estimate of ΔL becomes unreliable at large plucks.`);
   }
 
   return out;
@@ -535,8 +536,12 @@ function collectWarnings(m) {
 
 /* ============================================================================
    7 · THE INSIGHT CARD
-   Ranked from the model outputs — never hard-coded, and deliberately hedged.
+   Ranked from the model outputs for the current parameters.
    ========================================================================== */
+
+function capitalize(text) {
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
+}
 
 function buildInsight(m) {
   const candidates = [
@@ -544,18 +549,18 @@ function buildInsight(m) {
       key: 'fret',
       cents: m.fretting.applies ? m.fretting.cents : null,
       name: 'fretting geometry',
-      phrase: `pressing the string to fret ${m.fret} stretches it by ${(m.fretting.path.extension * 1e6).toFixed(0)} µm and adds ${m.fretting.deltaT.toFixed(2)} N of tension`
+      phrase: `fret ${m.fret} stretches the string by ${(m.fretting.path.extension * 1e6).toFixed(0)} µm and adds ${m.fretting.deltaT.toFixed(2)} N of tension`
     },
     {
       key: 'stiff',
       cents: m.stiff.fundamentalCents,
       name: 'bending stiffness',
-      phrase: `a bending-stiffness coefficient of B = ${m.stiff.B.toExponential(2)} lifts even the fundamental`
+      phrase: `B = ${m.stiff.B.toExponential(2)} lifts even the fundamental`
     },
     {
       key: 'pluck',
       cents: m.pluck.meanCents,
-      name: 'amplitude-dependent tension',
+      name: 'pluck tension',
       phrase: `a ${(m.pluck.amplitude * 1000).toFixed(1)} mm pluck adds up to ${m.pluck.peakDeltaT.toFixed(2)} N at the peak of each cycle`
     }
   ].filter((c) => c.cents !== null);
@@ -569,28 +574,27 @@ function buildInsight(m) {
   let body;
 
   if (Math.abs(top.cents) < AUDIBLE_CENTS * 0.4) {
-    headline = 'None of the modelled effects moves the fundamental much under these parameters.';
-    body = `The largest predicted shift of the fundamental is ${formatCents(top.cents)} from ${top.name}, comfortably below the roughly ${AUDIBLE_CENTS}-cent difference most listeners can resolve on a sustained tone. `;
+    headline = 'No modelled effect moves the fundamental audibly.';
+    body = `The largest shift is ${formatCents(top.cents)}, from ${top.name}. That is well below the ${AUDIBLE_CENTS}¢ reference. `;
   } else {
-    headline = `Under these parameters the dominant modelled shift of the fundamental is ${top.name}, at ${formatCents(top.cents)}.`;
-    body = `That is the prediction because ${top.phrase}. `;
+    headline = `${capitalize(top.name)} moves the fundamental most: ${formatCents(top.cents)}.`;
+    body = `${capitalize(top.phrase)}. `;
     if (second) {
       const ratio = Math.abs(second.cents) > 1e-9 ? Math.abs(top.cents / second.cents) : Infinity;
       body += ratio > 3
-        ? `The next largest, ${second.name}, is ${formatCents(second.cents)} — smaller by a factor of about ${ratio < 100 ? ratio.toFixed(0) : '100 or more'}. `
-        : `${second.name.charAt(0).toUpperCase()}${second.name.slice(1)} is close behind at ${formatCents(second.cents)}, so neither one dominates cleanly here. `;
+        ? `${capitalize(second.name)} follows at ${formatCents(second.cents)}, ${ratio < 100 ? `about ${ratio.toFixed(0)}×` : 'more than 100×'} smaller. `
+        : `${capitalize(second.name)} is close behind at ${formatCents(second.cents)}, so no single effect dominates. `;
     }
   }
 
-  // Stiffness barely touches the fundamental but can dominate the overtones,
-  // which is a different claim and worth making separately.
+  // Stiffness barely moves the fundamental but can dominate the overtones.
   const fretCents = m.fretting.applies ? Math.abs(m.fretting.cents) : 0;
   if (Math.abs(topPartial.cents) > Math.max(fretCents, AUDIBLE_CENTS)) {
-    body += `Look higher up the spectrum and the ranking changes: partial ${topPartial.n} is predicted ${formatCents(topPartial.cents)} away from its harmonic position, ${m.fretting.applies ? `larger than the ${formatCents(m.fretting.cents)} that fretting moves the fundamental` : 'a shift the fundamental never sees'}. Stiffness is heard as a change in timbre and in how octaves must be tuned, not as a change in the note itself.`;
+    body += `Upper partials move more. Partial ${topPartial.n} sits ${formatCents(topPartial.cents)} from its harmonic position${m.fretting.applies ? `, more than the ${formatCents(m.fretting.cents)} fretting adds to the fundamental` : ''}. Stiffness changes timbre and octave tuning more than the pitch of the note.`;
   } else if (Math.abs(topPartial.cents) > 1) {
-    body += `Across the ${m.partialCount} partials shown, the largest departure from the harmonic series is ${formatCents(topPartial.cents)} at partial ${topPartial.n}.`;
+    body += `Across the ${m.partialCount} partials shown, the largest departure from harmonic is ${formatCents(topPartial.cents)} at partial ${topPartial.n}.`;
   } else {
-    body += `The partials stay within ${formatCents(topPartial.cents)} of the harmonic series over the ${m.partialCount} shown, so this string is close to harmonic.`;
+    body += `The ${m.partialCount} partials shown stay within ${formatCents(topPartial.cents)} of the harmonic series, so this string is nearly harmonic.`;
   }
 
   return { headline, body, ranked: candidates };
@@ -971,7 +975,7 @@ function drawFretboard(ctx, w, h, m, displacement, label, headroom) {
     ctx.stroke();
     ctx.restore();
     glowDot(ctx, xOf(path.xPress), yOf(path.yPress), 3, PALETTE.rust, 8);
-    caption(ctx, 'static — sets tension, not pitch',
+    caption(ctx, 'static · sets the tension',
       xOf(path.xPress * 0.45), yOf(line.yNut) - 16, hexToRgba(PALETTE.rust, 0.65), 8.5, 'center');
   }
 
@@ -1029,7 +1033,7 @@ function drawFretboard(ctx, w, h, m, displacement, label, headroom) {
       `ΔL = ${(m.fretting.path.extension * 1e6).toFixed(1)} µm  →  ΔT = ${m.fretting.deltaT.toFixed(2)} N`,
       padX, h - 8, hexToRgba(PALETTE.rust, 0.85), 10);
   } else {
-    plainText(ctx, 'open string — no fretting, no added tension',
+    plainText(ctx, 'open string · no fret pressed',
       padX, h - 8, hexToRgba(PALETTE.ink, 0.35), 10);
   }
 
@@ -1064,9 +1068,9 @@ function drawStiff(ctx, w, h, m, t, view) {
     const count = m.partialCount;
     const norm = amplitude / count;
 
-    // A dim ghost of the same sum with perfectly harmonic partials, so the
-    // drift between the two is visible rather than merely asserted. Both sums
-    // take their per-mode cosine once, outside the sample loop.
+    // A dim ghost of the same sum with harmonic partials, so the drift
+    // between the two is visible. Each mode's cosine is computed once,
+    // outside the sample loop.
     for (let k = 0; k < MAX_MODES; k++) {
       coefBuffer[k] = k < count ? norm * Math.cos(TAU * m.stiff.partials[k].ideal * t) : 0;
     }
@@ -1104,7 +1108,7 @@ function drawStiff(ctx, w, h, m, t, view) {
     ctx.stroke();
     ctx.restore();
 
-    caption(ctx, `${count} partials superposed`, padX, 22, PALETTE.violet, 10);
+    caption(ctx, `${count} partials summed`, padX, 22, PALETTE.violet, 10);
   } else {
     // A single partial is still a standing wave, so its nodes are real.
     const partial = m.stiff.selected;
@@ -1201,7 +1205,7 @@ function drawPluck(ctx, w, h, m, t) {
   ctx.lineTo(xp, midY + ampPx * 1.15);
   ctx.stroke();
   ctx.restore();
-  plainText(ctx, `pluck at ${(m.pluck.position * 100).toFixed(0)} % of L`,
+  plainText(ctx, `pluck at ${(m.pluck.position * 100).toFixed(0)}% of L`,
     xp + 6, midY + ampPx * 1.15, hexToRgba(PALETTE.gold, 0.6), 9);
 
   drawClamps(ctx, padX, padX + spanX, midY, h);
@@ -1225,7 +1229,7 @@ function drawCombined(ctx, w, h, m, t) {
   const coefficients = pluckCoefficients(m, t, frequencies, coefBuffer);
   const y = sumModes(coefficients, MAX_MODES);
 
-  drawFretboard(ctx, w, h, m, (u, i) => y[i], 'all effects combined', m.pluck.amplitude);
+  drawFretboard(ctx, w, h, m, (u, i) => y[i], 'combined', m.pluck.amplitude);
 }
 
 /* ============================================================================
@@ -1480,7 +1484,7 @@ const FIELDS = [
   { id: 'mu', key: 'mu', fmt: (v) => `${v.toFixed(2)} g/m`, group: 'string' },
   { id: 'diameter', key: 'diameter', group: 'string',
     fmt: (v) => `${v.toFixed(2)} mm · .${String(Math.round((v / 25.4) * 1000)).padStart(3, '0')}″` },
-  { id: 'core', key: 'core', fmt: (v) => `${(v * 100).toFixed(0)} % of d`, group: 'string' },
+  { id: 'core', key: 'core', fmt: (v) => `${(v * 100).toFixed(0)}% of d`, group: 'string' },
   { id: 'youngs', key: 'youngs', fmt: (v) => `${v.toFixed(0)} GPa`, group: 'string' },
   { id: 'tension', key: 'tension', fmt: (v) => `${v.toFixed(1)} N`, group: 'string' },
   { id: 'scale', key: 'scale', fmt: (v) => `${v.toFixed(0)} mm` },
@@ -1490,12 +1494,12 @@ const FIELDS = [
   { id: 'fretheight', key: 'fretHeight', fmt: (v) => `${v.toFixed(2)} mm` },
   { id: 'nutheight', key: 'nutHeight', fmt: (v) => `${v.toFixed(2)} mm` },
   { id: 'pressoffset', key: 'pressOffset', fmt: (v) => `${v.toFixed(1)} mm` },
-  { id: 'press', key: 'press', fmt: (v) => `${(v * 100).toFixed(0)} % of fret height` },
+  { id: 'press', key: 'press', fmt: (v) => `${(v * 100).toFixed(0)}% of fret height` },
   { id: 'mode', key: 'mode', fmt: (v) => `n = ${v}` },
   { id: 'amplitude', key: 'amplitude', fmt: (v) => `${v.toFixed(1)} mm` },
   { id: 'partials', key: 'partials', fmt: (v) => `${v} partials` },
   { id: 'pluck', key: 'pluck', fmt: (v) => `${v.toFixed(1)} mm` },
-  { id: 'pluckpos', key: 'pluckPos', fmt: (v) => `${(v * 100).toFixed(0)} % of L` },
+  { id: 'pluckpos', key: 'pluckPos', fmt: (v) => `${(v * 100).toFixed(0)}% of L` },
   { id: 'damping', key: 'damping', fmt: (v) => `${v.toFixed(1)} s⁻¹` },
   { id: 'slow', key: 'slow', fmt: (v) => `1 : ${v.toFixed(0)}` }
 ];
@@ -1508,40 +1512,40 @@ const TOGGLES = [
 
 const LEGENDS = {
   ideal: [
-    { label: 'Standing wave (resultant)', color: PALETTE.blue },
-    { label: 'Travelling component →', color: PALETTE.violet, dashed: false },
-    { label: 'Travelling component ←', color: PALETTE.gold },
+    { label: 'Standing wave', color: PALETTE.blue },
+    { label: 'Wave moving right', color: PALETTE.violet, dashed: false },
+    { label: 'Wave moving left', color: PALETTE.gold },
     { label: 'Envelope', color: PALETTE.blue, dashed: true },
     { label: 'Nodes', color: PALETTE.gold }
   ],
   fret: [
     { label: 'Vibrating segment', color: PALETTE.blue },
-    { label: 'Static fretted path', color: PALETTE.rust },
+    { label: 'Pressed path (static)', color: PALETTE.rust },
     { label: 'Resting string', color: PALETTE.ink, dashed: true },
     { label: 'Selected fret', color: PALETTE.gold }
   ],
   stiff: [
     { label: 'Stiff string', color: PALETTE.violet },
-    { label: 'Perfectly harmonic partials', color: PALETTE.ink, dashed: true },
-    { label: 'Nodes (single partial only)', color: PALETTE.gold }
+    { label: 'Harmonic partials', color: PALETTE.ink, dashed: true },
+    { label: 'Nodes (one partial)', color: PALETTE.gold }
   ],
   pluck: [
     { label: 'Plucked string', color: PALETTE.rust },
-    { label: 'Initial triangle', color: PALETTE.gold, dashed: true }
+    { label: 'Release shape', color: PALETTE.gold, dashed: true }
   ],
   all: [
-    { label: 'Vibrating segment, all effects', color: PALETTE.blue },
-    { label: 'Static fretted path', color: PALETTE.rust },
+    { label: 'Vibrating segment', color: PALETTE.blue },
+    { label: 'Pressed path (static)', color: PALETTE.rust },
     { label: 'Resting string', color: PALETTE.ink, dashed: true }
   ]
 };
 
 const STAGE_NOTES = {
-  ideal: 'The two faint waves travel in opposite directions; their sum is the bright string. Where they always cancel there is a node, which is why only whole numbers of half-wavelengths fit between the clamps.',
-  fret: 'The nut-to-fret side of the string is drawn but never vibrates: it contributes to the stretched path, and therefore to the tension, but not to the pitch. Heights are exaggerated by the stated factor — a millimetre of action on a half-metre string would otherwise be invisible.',
-  stiff: 'The dim trace behind the string is the same superposition with perfectly harmonic partials. The two drift apart because the stiff partials share no common period, so the waveform never exactly repeats.',
-  pluck: `The string is released from the dashed triangle at rest and evolves as a sum of ${MAX_MODES} normal modes. The reported tension is recomputed from the instantaneous shape every frame.`,
-  all: 'The fretted length and tension set the frequencies, bending stiffness stretches them, and the decaying pluck adds its own tension on top.'
+  ideal: "The faint traces are waves travelling in opposite directions. Their sum is the standing wave. Nodes stay still because the two waves cancel there.",
+  fret: "Only the segment from the fret to the bridge vibrates. The segment behind the fret still contributes to the string’s total stretch.",
+  stiff: "The pale trace uses harmonic partials; the violet trace includes bending stiffness. Their relative phase slowly slips because the partials are no longer exact multiples.",
+  pluck: "The dashed triangle is the release shape. The moving string is its normal-mode expansion.",
+  all: "The motion is drawn on the fretted string. The readouts separate the contributions to its pitch."
 };
 
 class App {
@@ -1762,33 +1766,33 @@ class App {
         { label: `Wavelength λ${m.mode}`, value: `${(m.ideal.wavelength * 1000).toFixed(1)} mm`, sub: `2L / ${m.mode}` },
         { label: `Frequency f${m.mode}`, value: formatHz(m.ideal.frequency), sub: noteName(m.ideal.frequency) },
         { label: 'Fundamental f₁', value: formatHz(m.ideal.fundamental), sub: noteName(m.ideal.fundamental) },
-        { label: 'Nodes', value: String(m.ideal.nodes), sub: 'including both clamps' },
+        { label: 'Nodes', value: String(m.ideal.nodes), sub: 'including the clamps' },
         { label: 'Antinodes', value: String(m.ideal.antinodes), sub: 'one per half-wavelength' },
-        { label: 'Vibrating length', value: `${(m.length * 1000).toFixed(1)} mm`, sub: `${m.fret === 0 ? 'open string' : `fret ${m.fret}`}` }
+        { label: 'Vibrating length', value: `${(m.length * 1000).toFixed(1)} mm`, sub: m.fret === 0 ? 'open string' : `fret ${m.fret}` }
       ];
     } else if (model === 'fret') {
       const applies = m.fretting.applies;
       items = [
         { label: 'Equal-tempered target', value: formatHz(m.fretting.targetFrequency), sub: noteName(m.fretting.targetFrequency) },
-        { label: 'Predicted frequency', value: formatHz(m.fretting.frequency), sub: applies ? 'with the added tension' : 'open string' },
-        { label: 'Tension rise ΔT', value: applies ? `${m.fretting.deltaT.toFixed(3)} N` : 'n/a', sub: applies ? `${(m.fretting.tensionRatio * 100).toFixed(2)} % of T₀` : 'nothing is pressed' },
-        { label: 'Extension ΔL', value: applies ? `${(m.fretting.path.extension * 1e6).toFixed(1)} µm` : 'n/a', sub: 'total path minus resting path' },
-        { label: 'Frequency shift', value: applies ? `${m.fretting.deltaHz >= 0 ? '+' : '−'}${Math.abs(m.fretting.deltaHz).toFixed(3)} Hz` : 'n/a', sub: 'against the target' },
+        { label: 'Predicted frequency', value: formatHz(m.fretting.frequency), sub: applies ? 'includes the tension rise' : 'open string' },
+        { label: 'Tension rise ΔT', value: applies ? `${m.fretting.deltaT.toFixed(3)} N` : 'n/a', sub: applies ? `${(m.fretting.tensionRatio * 100).toFixed(2)}% of T₀` : 'No fret selected' },
+        { label: 'Extension ΔL', value: applies ? `${(m.fretting.path.extension * 1e6).toFixed(1)} µm` : 'n/a', sub: 'pressed path minus resting path' },
+        { label: 'Frequency shift', value: applies ? `${m.fretting.deltaHz >= 0 ? '+' : '−'}${Math.abs(m.fretting.deltaHz).toFixed(3)} Hz` : 'n/a', sub: 'Relative to equal temperament' },
         { label: 'Intonation error', value: applies ? formatCents(m.fretting.cents) : 'n/a',
           tone: applies && Math.abs(m.fretting.cents) > AUDIBLE_CENTS ? 'sharp' : 'calm',
           sub: applies
-            ? (Math.abs(m.fretting.cents) > AUDIBLE_CENTS ? 'above the audible threshold' : 'below the audible threshold')
-            : 'open string' },
+            ? (Math.abs(m.fretting.cents) > AUDIBLE_CENTS ? `Above ${AUDIBLE_CENTS}¢ reference` : `Below ${AUDIBLE_CENTS}¢ reference`)
+            : 'No fret selected' },
         applies
           ? {
-            label: 'Reading',
-            value: m.fretting.cents >= 0 ? 'sharp' : 'flat',
-            sub: `the geometry model predicts this note is ${formatCents(m.fretting.cents, 1)} ${m.fretting.cents >= 0 ? 'sharp' : 'flat'}`
+            label: 'Status',
+            value: m.fretting.cents >= 0 ? 'Sharp' : 'Flat',
+            sub: `${formatCents(m.fretting.cents, 1)} relative to equal temperament`
           }
           : {
-            label: 'Reading',
-            value: 'open',
-            sub: 'select a fret from 1 to 24 to press the string down'
+            label: 'Status',
+            value: 'Open string',
+            sub: 'No fret selected'
           }
       ];
     } else if (model === 'stiff') {
@@ -1796,34 +1800,34 @@ class App {
       const top = m.stiff.top;
       items = [
         { label: 'Inharmonicity B', value: m.stiff.B.toExponential(2), sub: 'π³E r⁴ / 4TL²' },
-        { label: 'Fundamental f₁', value: formatHz(m.ideal.fundamental), sub: 'ideal, before stiffness' },
+        { label: 'Fundamental f₁', value: formatHz(m.ideal.fundamental), sub: 'ideal value' },
         { label: `Partial ${sel.n} · ideal`, value: formatHz(sel.ideal), sub: `${sel.n} × f₁` },
         { label: `Partial ${sel.n} · stiff`, value: formatHz(sel.stiff), sub: `+${sel.deltaHz.toFixed(3)} Hz` },
-        { label: `Partial ${sel.n} deviation`, value: formatCents(sel.cents), tone: Math.abs(sel.cents) > AUDIBLE_CENTS ? 'sharp' : 'calm', sub: 'from its harmonic position' },
-        { label: `Partial ${top.n} deviation`, value: formatCents(top.cents), tone: Math.abs(top.cents) > AUDIBLE_CENTS ? 'sharp' : 'calm', sub: 'highest partial shown' },
-        { label: 'Fundamental shift', value: formatCents(m.stiff.fundamentalCents), sub: 'stiffness lifts even n = 1' }
+        { label: `Partial ${sel.n} deviation`, value: formatCents(sel.cents), tone: Math.abs(sel.cents) > AUDIBLE_CENTS ? 'sharp' : 'calm', sub: `${Math.abs(sel.cents) > AUDIBLE_CENTS ? 'Above' : 'Below'} ${AUDIBLE_CENTS}¢ reference` },
+        { label: `Partial ${top.n} deviation`, value: formatCents(top.cents), tone: Math.abs(top.cents) > AUDIBLE_CENTS ? 'sharp' : 'calm', sub: `Highest partial · ${Math.abs(top.cents) > AUDIBLE_CENTS ? 'above' : 'below'} ${AUDIBLE_CENTS}¢ reference` },
+        { label: 'Fundamental shift', value: formatCents(m.stiff.fundamentalCents), sub: 'effect on f₁' }
       ];
     } else if (model === 'pluck') {
       const live = this.liveTension();
       items = [
-        { label: 'Initial pitch shift', value: formatCents(m.pluck.meanCents), tone: 'hot', sub: 'cycle-averaged, at t = 0' },
+        { label: 'Initial pitch shift', value: formatCents(m.pluck.meanCents), tone: 'hot', sub: 'cycle average at release' },
         { label: 'Instantaneous shift', value: formatCents(live.cents), sub: `t = ${(this.t * 1000).toFixed(1)} ms` },
-        { label: 'Peak tension rise', value: `${m.pluck.peakDeltaT.toFixed(3)} N`, sub: `${(100 * m.pluck.peakDeltaT / m.tension).toFixed(2)} % of T₀` },
-        { label: 'Peak extension', value: `${(m.pluck.peakExtension * 1e6).toFixed(1)} µm`, sub: 'small-slope approximation' },
-        { label: 'Nominal pitch', value: formatHz(m.ideal.fundamental), sub: 'once the motion has decayed' },
-        { label: 'Current pitch', value: formatHz(live.frequency), sub: 'predicted, not synthesised' },
-        { label: 'Model caveat', value: 'approximate', tone: 'hot', sub: 'small-slope, fixed mode shapes, no mode coupling' }
+        { label: 'Peak tension rise', value: `${m.pluck.peakDeltaT.toFixed(3)} N`, sub: `${(100 * m.pluck.peakDeltaT / m.tension).toFixed(2)}% of T₀` },
+        { label: 'Peak extension', value: `${(m.pluck.peakExtension * 1e6).toFixed(1)} µm`, sub: 'small-slope estimate' },
+        { label: 'Nominal pitch', value: formatHz(m.ideal.fundamental), sub: 'after the motion decays' },
+        { label: 'Current pitch', value: formatHz(live.frequency), sub: 'from the current shape' },
+        { label: 'Model limits', value: 'Small plucks', tone: 'hot', sub: 'Fixed mode shapes · no mode coupling' }
       ];
     } else {
       const live = this.liveTension();
       items = [
         { label: 'Equal-tempered target', value: formatHz(m.combined.targetFrequency), sub: noteName(m.combined.targetFrequency) },
-        { label: 'Combined prediction', value: formatHz(m.combined.frequency), sub: 'all three corrections' },
-        { label: 'Total deviation', value: formatCents(m.combined.cents), tone: Math.abs(m.combined.cents) > AUDIBLE_CENTS ? 'sharp' : 'calm', sub: 'against the target' },
+        { label: 'Combined prediction', value: formatHz(m.combined.frequency), sub: 'fretting, stiffness, pluck' },
+        { label: 'Total deviation', value: formatCents(m.combined.cents), tone: Math.abs(m.combined.cents) > AUDIBLE_CENTS ? 'sharp' : 'calm', sub: 'Relative to equal temperament' },
         { label: 'From fretting', value: m.fretting.applies ? formatCents(m.fretting.cents) : 'n/a', sub: `ΔT = ${m.fretting.deltaT.toFixed(3)} N` },
         { label: 'From stiffness', value: formatCents(m.stiff.fundamentalCents), sub: `B = ${m.stiff.B.toExponential(2)}` },
-        { label: 'From amplitude', value: formatCents(m.pluck.meanCents), sub: 'cycle-averaged, at t = 0' },
-        { label: 'Instantaneous', value: formatCents(live.cents), sub: `t = ${(this.t * 1000).toFixed(1)} ms` }
+        { label: 'From pluck', value: formatCents(m.pluck.meanCents), sub: 'cycle average at release' },
+        { label: 'Instantaneous shift', value: formatCents(live.cents), sub: `t = ${(this.t * 1000).toFixed(1)} ms` }
       ];
     }
 
@@ -1884,51 +1888,56 @@ class App {
     const m = this.model;
     const rows = [
       {
+        key: 'ideal',
         model: 'Ideal string',
         quantity: `Fundamental at L = ${(m.length * 1000).toFixed(1)} mm`,
         prediction: formatHz(m.ideal.fundamental),
-        shift: '— baseline —',
+        shift: 'Baseline',
         cls: 'dim',
-        note: `Wave speed ${m.ideal.speed.toFixed(1)} m/s. With nominal fret placement this is also the equal-tempered target, so every other row is read against it.`
+        note: `Wave speed ${m.ideal.speed.toFixed(1)} m/s. This is also the equal-tempered target, so the other rows are compared with it.`
       },
       {
-        model: 'Fretted geometry',
+        key: 'fret',
+        model: 'Fretted string',
         quantity: m.fretting.applies ? `Fret ${m.fret}, ΔT = ${m.fretting.deltaT.toFixed(3)} N` : 'Open string',
         prediction: m.fretting.applies ? formatHz(m.fretting.frequency) : 'n/a',
         shift: m.fretting.applies ? formatCents(m.fretting.cents) : 'n/a',
         cls: m.fretting.applies ? (m.fretting.cents >= 0 ? 'sharp' : 'flat') : 'dim',
         note: m.fretting.applies
-          ? `The pressed path is ${(m.fretting.path.extension * 1e6).toFixed(1)} µm longer than the resting path, which this model predicts makes the note ${formatCents(m.fretting.cents, 1)} ${m.fretting.cents >= 0 ? 'sharp' : 'flat'}.`
-          : 'Nothing is pressed against a fret, so the geometry adds no tension.'
+          ? `The pressed path is ${(m.fretting.path.extension * 1e6).toFixed(1)} µm longer than the resting path. The added tension makes the note ${formatCents(m.fretting.cents, 1)} ${m.fretting.cents >= 0 ? 'sharp' : 'flat'}.`
+          : 'No fret selected. Nothing is pressed, so ΔT = 0.'
       },
       {
+        key: 'stiff',
         model: 'Stiff string',
         quantity: `Fundamental, B = ${m.stiff.B.toExponential(2)}`,
         prediction: formatHz(m.ideal.fundamental * Math.sqrt(1 + m.stiff.B)),
         shift: formatCents(m.stiff.fundamentalCents),
         cls: 'sharp',
-        note: `Stiffness barely touches the fundamental. Its visible effect is on the overtones: partial ${m.stiff.top.n} is predicted ${formatCents(m.stiff.top.cents, 1)} from its harmonic position.`
+        note: `Most of the effect is in the upper partials. Partial ${m.stiff.top.n} sits ${formatCents(m.stiff.top.cents, 1)} from its harmonic position.`
       },
       {
-        model: 'Amplitude tension',
-        quantity: `${(m.pluck.amplitude * 1000).toFixed(1)} mm pluck at ${(m.pluck.position * 100).toFixed(0)} % of L`,
+        key: 'pluck',
+        model: 'Plucked string',
+        quantity: `Pluck height ${(m.pluck.amplitude * 1000).toFixed(1)} mm at ${(m.pluck.position * 100).toFixed(0)}% of L`,
         prediction: formatHz(idealFrequency(1, m.length, m.tension + 0.5 * m.pluck.peakDeltaT, m.mu)),
         shift: formatCents(m.pluck.meanCents),
         cls: 'sharp',
-        note: `Cycle-averaged at the moment of release, decaying to zero as the motion dies. The instantaneous peak is ${formatCents(m.pluck.peakCents, 1)}.`
+        note: `Cycle average at release. The shift decays to zero with the motion. The instantaneous peak is ${formatCents(m.pluck.peakCents, 1)}.`
       },
       {
-        model: 'All effects',
-        quantity: 'Every correction applied together',
+        key: 'all',
+        model: 'Combined',
+        quantity: 'All corrections together',
         prediction: formatHz(m.combined.frequency),
         shift: formatCents(m.combined.cents),
         cls: m.combined.cents >= 0 ? 'sharp' : 'flat',
-        note: 'The three shifts are close to additive in cents because each is small; this row applies them all to the same fundamental.'
+        note: 'Fretting, stiffness, and pluck height applied to the same fundamental. For small shifts, the cents add.'
       }
     ];
 
     this.dom.compareBody.innerHTML = rows.map((row) => `
-      <tr${row.model.startsWith(this.currentModelName()) ? ' class="is-active"' : ''}>
+      <tr${row.key === this.params.model ? ' class="is-active"' : ''}>
         <td class="model-cell">${row.model}</td>
         <td>${row.quantity}</td>
         <td>${row.prediction}</td>
@@ -1936,12 +1945,6 @@ class App {
         <td class="note-cell">${row.note}</td>
       </tr>
     `).join('');
-  }
-
-  currentModelName() {
-    return {
-      ideal: 'Ideal', fret: 'Fretted', stiff: 'Stiff', pluck: 'Amplitude', all: 'All'
-    }[this.params.model];
   }
 
   renderPartials() {
@@ -1953,7 +1956,7 @@ class App {
         <td>${formatHz(partial.stiff)}</td>
         <td>+${partial.deltaHz.toFixed(3)} Hz</td>
         <td class="sharp">${formatCents(partial.cents)}</td>
-        <td class="${partial.nearest === partial.n ? 'dim' : 'sharp'}">${partial.nearest}${partial.nearest === partial.n ? '' : ' — drifted'}</td>
+        <td class="${partial.nearest === partial.n ? 'dim' : 'sharp'}">${partial.nearest}${partial.nearest === partial.n ? '' : ' (moved)'}</td>
       </tr>
     `).join('');
   }
@@ -1992,11 +1995,11 @@ class App {
       yLabel: 'Predicted error (cents)',
       series: [{ type: 'line', color: PALETTE.gold, points, dots: true, radius: 2 }],
       vLines: m.fretting.applies ? [{ x: m.fret, color: hexToRgba(PALETTE.blue, 0.5) }] : [],
-      hLines: [{ y: AUDIBLE_CENTS, color: hexToRgba(PALETTE.ink, 0.28), label: `${AUDIBLE_CENTS} cents` }],
+      hLines: [{ y: AUDIBLE_CENTS, color: hexToRgba(PALETTE.ink, 0.28), label: `${AUDIBLE_CENTS}¢ reference` }],
       idleText: m.fretting.applies
-        ? `fret ${m.fret}: ${formatCents(m.fretting.cents)} · ΔT = ${m.fretting.deltaT.toFixed(3)} N`
-        : 'open string — select a fret to place the marker',
-      format: (pt) => `fret ${pt.x}: ${formatCents(pt.y)} · ΔT = ${pt.deltaT.toFixed(3)} N`
+        ? `Fret ${m.fret}: ${formatCents(m.fretting.cents)} · ΔT = ${m.fretting.deltaT.toFixed(3)} N`
+        : 'No fret selected',
+      format: (pt) => `Fret ${pt.x}: ${formatCents(pt.y)} · ΔT = ${pt.deltaT.toFixed(3)} N`
     });
   }
 
@@ -2014,7 +2017,7 @@ class App {
       xRange: [0.4, m.partialCount + 0.6],
       yRange: [-1.15, 1.15],
       xLabel: 'Frequency in units of the fundamental, f / f₁',
-      yLabel: 'ideal ↑    stiff ↓',
+      yLabel: 'ideal ↑   stiff ↓',
       series: [
         {
           type: 'stem', color: PALETTE.violet, width: 1.6, radius: 2.6,
@@ -2032,9 +2035,9 @@ class App {
         { label: 'ideal n f₁', color: hexToRgba(PALETTE.ink, 0.4) },
         { label: 'stiff string', color: PALETTE.violet }
       ],
-      idleText: `f₁ = ${formatHz(f1)} · partial ${top.n} lands at ${(top.stiff / f1).toFixed(3)} f₁ instead of ${top.n}`,
-      format: (pt) => `partial ${pt.n}: ${formatHz(pt.hz)}` +
-        (pt.cents === undefined ? ' (ideal position)' : ` · ${formatCents(pt.cents)} sharp of ${pt.n} f₁`)
+      idleText: `f₁ = ${formatHz(f1)} · partial ${top.n} sits at ${(top.stiff / f1).toFixed(3)} f₁ (ideal: ${top.n})`,
+      format: (pt) => `Partial ${pt.n}: ${formatHz(pt.hz)}` +
+        (pt.cents === undefined ? ' (ideal)' : ` · ${formatCents(pt.cents)} from ${pt.n} f₁`)
     });
 
     const points = m.stiff.partials.map((p) => ({ x: p.n, y: p.cents, hz: p.stiff }));
@@ -2045,10 +2048,10 @@ class App {
       xLabel: 'Partial number n',
       yLabel: 'Deviation (cents)',
       series: [{ type: 'line', color: PALETTE.violet, points, dots: true, radius: 2.4 }],
-      hLines: [{ y: AUDIBLE_CENTS, color: hexToRgba(PALETTE.ink, 0.28), label: `${AUDIBLE_CENTS} cents` }],
+      hLines: [{ y: AUDIBLE_CENTS, color: hexToRgba(PALETTE.ink, 0.28), label: `${AUDIBLE_CENTS}¢ reference` }],
       vLines: [{ x: m.mode, color: hexToRgba(PALETTE.gold, 0.4) }],
-      idleText: `grows as n² for small B · partial ${top.n}: ${formatCents(top.cents)}`,
-      format: (pt) => `partial ${pt.x}: ${formatCents(pt.y)} at ${formatHz(pt.hz)}`
+      idleText: `Grows as n² for small B · partial ${top.n}: ${formatCents(top.cents)}`,
+      format: (pt) => `Partial ${pt.x}: ${formatCents(pt.y)} at ${formatHz(pt.hz)}`
     });
   }
 
@@ -2072,9 +2075,9 @@ class App {
       xLabel: 'Time after the pluck (ms)',
       yLabel: 'Pitch shift (cents)',
       series: [{ type: 'line', color: PALETTE.rust, points, width: 1.8 }],
-      hLines: [{ y: AUDIBLE_CENTS, color: hexToRgba(PALETTE.ink, 0.28), label: `${AUDIBLE_CENTS} cents` }],
+      hLines: [{ y: AUDIBLE_CENTS, color: hexToRgba(PALETTE.ink, 0.28), label: `${AUDIBLE_CENTS}¢ reference` }],
       vLines: [{ x: clamp(this.t * 1000, 0, span * 1000), color: hexToRgba(PALETTE.blue, 0.5) }],
-      idleText: `starts at ${formatCents(m.pluck.meanCents)} and decays at 2γ = ${(2 * m.pluck.damping).toFixed(1)} s⁻¹`,
+      idleText: `Starts at ${formatCents(m.pluck.meanCents)} and decays at 2γ = ${(2 * m.pluck.damping).toFixed(1)} s⁻¹`,
       format: (pt) => `${pt.x.toFixed(1)} ms: ${formatCents(pt.y)} · ΔT = ${pt.deltaT.toFixed(3)} N`
     });
   }
@@ -2131,7 +2134,7 @@ class App {
         const frequency = idealFrequency(m.mode, m.length, m.tension + m.fretting.deltaT, m.mu);
         const swing = Math.cos(TAU * frequency * this.t) * amplitude;
         drawFretboard(ctx, w, h, m,
-          (u, i) => SHAPE_TABLE[m.mode - 1][i] * swing, 'fretted geometry', amplitude);
+          (u, i) => SHAPE_TABLE[m.mode - 1][i] * swing, 'fretted string', amplitude);
         break;
       }
       case 'stiff':

@@ -1,52 +1,32 @@
 /* ============================================================================
-   BOTTLE LENS LABORATORY
-   IYPT 2015 problem 12 — "Thick Lens"
+   BOTTLE LENS LABORATORY — IYPT 2015, Problem 12 ("Thick Lens")
 
-   A liquid-filled bottle is a thick optical element with four refracting
-   interfaces. This file traces real rays through it with the vector form of
-   Snell's law, converts the resulting ray density into an approximate
-   irradiance, and drives a deliberately simple lumped thermal model of a
-   small target.
+   Traces rays through a liquid-filled bottle with the vector form of Snell's
+   law, converts ray density into an approximate irradiance, and drives a
+   lumped thermal model of a small target.
 
-   ----------------------------------------------------------------------------
-   SCOPE OF THE MODEL — read this before trusting any number
-   ----------------------------------------------------------------------------
-   * Everything is traced in a single two-dimensional MERIDIONAL SECTION: the
-     plane that contains the bottle's axis and the incoming beam. Skew rays,
-     which leave that plane, are not traced at all. For a body of revolution
-     illuminated on-axis the meridional section carries the whole story; for
-     anything tilted it does not, and the code says so in the sanity checks.
+   Model scope
+   - Rays are traced in one 2D meridional section: the plane containing the
+     bottle axis and the beam. Skew rays are not traced.
+   - The third dimension is an explicit choice (MODE). Extruding and revolving
+     the section give concentrations that differ by a large factor (~25x for
+     realistic geometry). Both are idealised bounds on the same 2D trace; a
+     real tilted or off-axis bottle lies between them.
+   - Geometric optics only: no diffraction, interference, or scattering.
+     Irradiance is binned from ray density, which is formally invalid at a
+     caustic, where the geometric irradiance diverges.
+   - The thermal model is one node. It reports a temperature, not ignition.
 
-   * The third dimension is supplied by an explicit choice (see MODE below),
-     not by an assumption buried in the code. Revolving the section and
-     extruding it give radically different concentrations — a factor of ~25 for
-     realistic geometry — and that difference is the physical heart of this
-     problem. BOTH are idealized radiometric conversions of the same 2D trace,
-     not measurements: revolved mode assumes a perfect body of revolution
-     illuminated exactly on-axis, extruded mode assumes a perfectly straight
-     cylinder illuminated exactly broadside. A real tilted or off-axis bottle
-     sits somewhere between the two, so they are best read as the pair of
-     idealized bounds a real bottle's concentration falls between, not as a
-     prediction for one specific setup.
-
-   * Geometric optics only. No diffraction, no interference, no scattering.
-     Irradiance is estimated by binning weighted rays, which is an
-     approximation that becomes formally invalid exactly at a caustic, where
-     the geometric-optics irradiance diverges.
-
-   * The thermal model is one node with one time constant. It reports a
-     temperature. It does not, and cannot, predict ignition.
-
-   Units: all geometry is in MILLIMETRES (comfortable slider numbers).
-   Radiometry converts to metres at the point of use, and every such
-   conversion is marked. Angles are radians internally, degrees in the UI.
-   ============================================================================ */
+   Units: geometry in millimetres, converted to metres where radiometry needs
+   SI (each conversion is marked). Angles are radians internally and degrees
+   in the UI.
+   ========================================================================== */
 
 'use strict';
 
-/* ============================================================================
-   0 · CONSTANTS AND DEFAULTS
-   ========================================================================== */
+// -----------------------------------------------------------------------------
+// 0. Constants and defaults
+// -----------------------------------------------------------------------------
 
 const MODE = {
   /** Extrude the traced profile out of the page: a cylindrical lens, line focus. */
@@ -61,15 +41,7 @@ const SIGMA = 5.670374419e-8;
 /** Kelvin offset. */
 const T0_K = 273.15;
 
-/**
- * Angular diameter of the Sun as seen from Earth, in radians (~0.53°).
- * The tracer launches a mathematically parallel beam, but the real Sun is an
- * extended source: every point of the focal plane receives an image of the
- * solar disc of width f·Θ. That sets a hard floor on the achievable spot size,
- * and therefore on the concentration. Ignoring it is the single easiest way to
- * produce a spectacular but meaningless concentration factor, so the floor is
- * applied explicitly and reported in the UI.
- */
+/** Angular diameter of the Sun, rad (~0.53°). Any focus is blurred by at least w_sun ≈ f·Θ, which caps the achievable concentration. */
 const SUN_ANGULAR_DIAMETER = 0.00930;
 
 /** Detector cell used for ray-density binning, mm. A stand-in for the finite
@@ -80,26 +52,17 @@ const PROFILE_BIN_MM = 0.5;
  *  total internal reflection would otherwise bounce forever. */
 const MAX_SEGMENTS = 18;
 
-/** Distance to step off a surface before searching for the next one, mm.
- *  Coordinates are O(100 mm) and doubles carry ~1e-13 mm of noise there, so
- *  1e-6 mm is seven orders of magnitude above the numerical grass and seven
- *  below any physical feature. */
+/** Step off a surface before searching for the next one, mm. Coordinates are O(100 mm) with ~1e-13 mm noise; 1e-6 mm clears it and is far below any physical feature. */
 const T_EPS = 1e-6;
 
 /** Distance either side of an interface used to sample which media meet
  *  there, mm. Larger than T_EPS so the probe lands unambiguously. */
 const PROBE_EPS = 1e-4;
 
-/** Recursion cap for Fresnel-reflected sub-ray branches (see RayTracer.traceBranch).
- *  Each extra level costs roughly one more interface's worth of tracing per
- *  surviving branch, and branches below MIN_BRANCH_POWER are pruned before
- *  recursing, so the cost stays bounded even though the recursion is real. */
+/** Recursion cap for Fresnel-reflected sub-rays (RayTracer.traceBranch). Branches under MIN_BRANCH_POWER are pruned, which bounds the cost. */
 const MAX_BRANCH_DEPTH = 3;
 
-/** A branch carrying less than this fraction of the original ray's power is
- *  dropped rather than traced further — it cannot move the power budget by
- *  more than this amount, and at 0.1% it is already far below the accuracy
- *  the rest of the model claims. */
+/** Branches carrying less than this fraction of the original power are dropped; at 0.1% they are below the model's accuracy. */
 const MIN_BRANCH_POWER = 1e-3;
 
 const DEFAULTS = Object.freeze({
@@ -123,10 +86,9 @@ const DEFAULTS = Object.freeze({
   paraxialOnly: false,
   showNormals: false,
   showAxis: true,
-  // Physical-throughput mode: off ("fast geometric") traces rays only, with
-  // every ray fully transmitted; on ("Fresnel-weighted") tracks how much
-  // power survives Fresnel reflection, optional liquid absorption, and
-  // (if branching is also on) reflected sub-rays. See buildTraceOptions().
+  // Physical throughput: off = every ray fully transmitted; on = Fresnel
+  // transmittance, optional liquid absorption, and optional branching
+  // (see buildTraceOptions).
   fresnel: true,
   liquidAttenuation: 0,   // 1/m — Beer–Lambert coefficient, only used when fresnel is on
   branching: false,       // trace reflected Fresnel sub-rays (needs fresnel on)
@@ -137,9 +99,7 @@ const DEFAULTS = Object.freeze({
   targetGap: 50,          // mm downstream of the rear vertex
   irradiance: 1000,       // W/m^2
   outOfPlaneWidth: 70,    // mm — only used by the cylindrical reading
-  // Solar absorptivity and thermal-IR emissivity are DIFFERENT quantities in
-  // general — see the note above HeatingModel — so they get independent
-  // controls rather than one shared "absorptivity" slider.
+  // Solar absorptivity and thermal emissivity are independent (see HeatingModel).
   alphaSolar: 0.9,
   epsilonThermal: 0.9,
   capacity: 150,          // J/(m^2 K) — areal, e.g. thin dark card
@@ -150,9 +110,7 @@ const DEFAULTS = Object.freeze({
   timeScale: 10           // playback multiplier
 });
 
-/** Refractive-index offsets used by the dispersion visualization. Water spans
- *  roughly 1.331 (red) to 1.337 (blue); the wall material disperses about
- *  twice as strongly. Visualization only — never used for reported numbers. */
+/** Index offsets for the dispersion display. Water spans ~1.331 (red) to ~1.337 (blue); the wall disperses about twice as strongly. Display only. */
 const DISPERSION = [
   { key: 'r', dLiquid: -0.003, dWall: -0.006, color: '#ff7a6a' },
   { key: 'g', dLiquid: 0.000, dWall: 0.000, color: '#8fe08a' },
@@ -180,9 +138,9 @@ const RAY_COLORS = {
   missed: '#7d8798'
 };
 
-/* ============================================================================
-   1 · SMALL UTILITIES
-   ========================================================================== */
+// -----------------------------------------------------------------------------
+// 1. Small utilities
+// -----------------------------------------------------------------------------
 
 const TAU = Math.PI * 2;
 
@@ -214,11 +172,10 @@ function makeRandom(seed) {
   };
 }
 
-/* ============================================================================
-   2 · Vec2 — plain-object vector helpers
-   Objects rather than a class: these are allocated in inner loops and V8
-   handles short-lived object literals with a stable shape extremely well.
-   ========================================================================== */
+// -----------------------------------------------------------------------------
+// 2. Vec2 — plain-object vector helpers
+// Object literals rather than a class: they are allocated in inner loops, where short-lived literals of stable shape are cheap.
+// -----------------------------------------------------------------------------
 
 const Vec2 = {
   add: (a, b) => ({ x: a.x + b.x, y: a.y + b.y }),
@@ -240,26 +197,19 @@ const Vec2 = {
   along: (p, d, t) => ({ x: p.x + d.x * t, y: p.y + d.y * t })
 };
 
-/* ============================================================================
-   3 · OPTICS PRIMITIVES
-   ========================================================================== */
+// -----------------------------------------------------------------------------
+// 3. Optics primitives
+// -----------------------------------------------------------------------------
 
 /**
- * Vector form of Snell's law.
+ * Vector form of Snell's law. The wave-vector component parallel to the
+ * interface is continuous: t_parallel = η d_parallel, η = n1/n2. Requiring
+ * |t| = 1 fixes the normal component:
+ *      t = η d + (η cosθ1 − cosθ2) n
  *
- * The physical input is that the component of the wave vector parallel to the
- * interface is continuous, which for unit direction vectors reads
- *      t_parallel = η · d_parallel ,  η = n1/n2
- * and is exactly n1 sinθ1 = n2 sinθ2 rewritten. Requiring |t| = 1 then fixes
- * the normal component, giving
- *      t = η d + (η cosθ1 − cosθ2) n .
- *
- * `n` must already be oriented against the incident direction, i.e. d·n < 0,
- * so that cosθ1 = −d·n is positive.
- *
- * Returns null on total internal reflection. The test is made on the same
- * quantity that would otherwise be square-rooted, so no NaN can ever escape
- * into the ray path — a failed refraction is always a clean, detected event.
+ * `n` must oppose the incident direction (d·n < 0) so cosθ1 = −d·n > 0.
+ * Returns null on total internal reflection; testing the radicand before the
+ * square root keeps NaN out of the ray path.
  */
 function refract(d, n, eta) {
   const cosI = -Vec2.dot(d, n);
@@ -279,14 +229,7 @@ function reflect(d, n) {
   return { x: d.x - k * n.x, y: d.y - k * n.y };
 }
 
-/**
- * Unpolarised Fresnel transmittance at a dielectric interface.
- * Sunlight is unpolarised, so the two polarisations are averaged. At normal
- * incidence between air and PET this costs about 4 % per surface; near the rim
- * of the bottle, where incidence angles climb past 60°, it grows steeply and
- * is a genuine reason the edge of the aperture contributes less than its area
- * suggests.
- */
+/** Unpolarised Fresnel transmittance: the mean of the s and p polarisations, since sunlight is unpolarised. */
 function fresnelTransmittance(n1, n2, cosI, cosT) {
   const rs = (n1 * cosI - n2 * cosT) / (n1 * cosI + n2 * cosT);
   const rp = (n1 * cosT - n2 * cosI) / (n1 * cosT + n2 * cosI);
@@ -294,12 +237,9 @@ function fresnelTransmittance(n1, n2, cosI, cosT) {
   return clamp(1 - R, 0, 1);
 }
 
-/* --------------------------------------------------------------------------
-   Ray/surface intersection
-   Surfaces are either circular arcs {kind:'arc', c, r, a0, span} or straight
-   segments {kind:'seg', p, q, n}. Both carry a `layer` tag ('outer', 'inner',
-   'free') used only for bookkeeping and drawing.
-   -------------------------------------------------------------------------- */
+// Ray/surface intersection. Surfaces are arcs {kind:'arc', c, r, a0, span} or
+// segments {kind:'seg', p, q, n}; `layer` ('outer' | 'inner' | 'free') is used
+// only for drawing and bookkeeping.
 
 /** Is `angle` inside the arc's anticlockwise sweep from a0 through span? */
 function angleInArc(angle, arc) {
@@ -399,40 +339,30 @@ function boxExitT(p, d, box) {
   return t;
 }
 
-/* ============================================================================
-   4 · BOTTLE GEOMETRY
-   ----------------------------------------------------------------------------
-   The outer profile is a capsule: a straight barrel of length L and half-height
-   a = D/2, closed by circular caps of radii R_L and R_R. A cap of radius R
-   meeting a barrel of half-height a must satisfy R ≥ a, and its circle is
-   centred inboard of the join by √(R² − a²):
+// -----------------------------------------------------------------------------
+// 4. Bottle geometry
+//
+// Outer profile: a capsule — a straight barrel of length L and half-height
+// a = D/2, closed by circular caps of radii R_L and R_R (R ≥ a). A cap's
+// circle is centred inboard of the join by √(R² − a²).
+//
+//          cap arc (R_L)          barrel          cap arc (R_R)
+//               ╭──────────────────────────────────────╮
+//       ────────┤                                      ├────────  y = +a
+//               │            ·C_L        ·C_R          │
+//       ────────┤                                      ├────────  y = −a
+//               ╰──────────────────────────────────────╯
+//               x = −L/2                        x = +L/2
+//
+// Inner (liquid) profile: the exact normal offset by the wall thickness t.
+// Arcs keep their centres and lose t from their radii; flats move in by t.
+//
+// Geometry is built in the bottle frame, then rotated by the tilt. Circles are
+// rotation-invariant, so a rotated arc is still an arc and tilt adds no cost
+// to the intersection routines.
+// -----------------------------------------------------------------------------
 
-           cap arc (R_L)          barrel          cap arc (R_R)
-                ╭──────────────────────────────────────╮
-        ────────┤                                      ├────────  y = +a
-                │            ·C_L        ·C_R          │
-        ────────┤                                      ├────────  y = −a
-                ╰──────────────────────────────────────╯
-                x = −L/2                        x = +L/2
-
-   The inner (liquid-facing) profile is the exact inward normal offset by the
-   wall thickness t: the arcs keep their centres and lose t from their radii,
-   the flats move in by t. The join between arc and flat shifts slightly
-   inboard, which is a genuine property of offset curves rather than an
-   approximation — it is computed, not fudged.
-
-   Everything is built in the bottle's own frame and then rotated by the tilt
-   angle. Circles are rotation-invariant, so a rotated arc is still an arc:
-   only its centre and its angular range move. That is why tilt costs nothing
-   in the intersection routines.
-   ========================================================================== */
-
-/**
- * Signed length of the inner barrel for a given wall thickness. Goes negative
- * when the wall is so thick that the two inner caps would overlap and the
- * cavity would pinch shut — the geometric failure mode this model must refuse
- * to enter.
- */
+/** Signed inner barrel length for wall thickness t. Negative when the inner caps would overlap and pinch the cavity shut. */
 function innerBarrelSpan(a, RL, RR, bodyLength, t) {
   const ai = a - t;
   const cL = -bodyLength / 2 + Math.sqrt(Math.max(0, RL * RL - a * a));
@@ -686,13 +616,7 @@ class BottleGeometry {
     return worldPt.y <= this.fillLevel;
   }
 
-  /**
-   * Refractive index at a world point.
-   * This single function is the entire medium bookkeeping of the tracer.
-   * Sampling it either side of an interface is more robust than carrying a
-   * medium stack, because it cannot desynchronise from the geometry — a ray
-   * that grazes a junction still gets a consistent answer.
-   */
+  /** Refractive index at a world point. Sampling on either side of an interface avoids a medium stack that could drift out of sync with the geometry. */
   mediumAt(worldPt, idx) {
     if (!this.insideOuter(worldPt)) return idx.air;
     if (!this.insideInner(worldPt)) return idx.wall;
@@ -718,12 +642,7 @@ class BottleGeometry {
     return { xMin: origin.x + lo, xMax: origin.x + hi };
   }
 
-  /**
-   * Find the world height at which a horizontal plane cuts off the requested
-   * fraction of the cavity's cross-sectional area. Solved by building the
-   * cumulative area profile once and inverting it by interpolation, which is
-   * both cheaper and more robust than bisecting on a noisy area integral.
-   */
+  /** World height of the horizontal plane that cuts off the given fraction of cavity area, found by inverting the cumulative area profile. */
   solveFillLevel() {
     this.freeSurface = null;
     this.fillLevel = Infinity;
@@ -810,21 +729,14 @@ function clipBelow(points, level) {
   return out;
 }
 
-/* ============================================================================
-   5 · RAY TRACER
-   ----------------------------------------------------------------------------
-   One low-level stepper, shared by two callers. At each step it finds the
-   nearest event among the bottle surfaces, the target plane, and the world
-   boundary — that event-finding logic is `nextRayEvent`, deliberately pulled
-   out as a standalone function rather than kept private to `trace()`, so the
-   same general machinery drives both the primary ray (`trace`) and the
-   optional reflected sub-rays spawned at a partial-Fresnel interface
-   (`traceBranch`). The four-interface sequence the problem describes —
-   air→wall→liquid→wall→air — is not hard-coded anywhere: it simply emerges
-   from a full bottle at normal incidence. Partial fills, tilts, and total
-   internal reflection produce different sequences automatically, and so does
-   every reflected branch.
-   ========================================================================== */
+// -----------------------------------------------------------------------------
+// 5. Ray tracer
+// One event-finder (`nextRayEvent`) drives both the primary ray (`trace`) and
+// Fresnel-reflected sub-rays (`traceBranch`). Each step takes the nearest of:
+// a bottle surface, the target plane, or the world boundary. The
+// air→wall→liquid→wall→air sequence is not hard-coded; it follows from the
+// geometry, so partial fills, tilt, and TIR produce other sequences.
+// -----------------------------------------------------------------------------
 
 /** Nearest bottle-surface intersection ahead of p, in direction d. */
 function nearestBottleSurface(geom, p, d) {
@@ -863,12 +775,7 @@ function nextRayEvent(geom, targetX, box, p, d) {
   return { kind: 'surface', t: tEnd, point, hit };
 }
 
-/**
- * Normalise the trace-options argument. A plain boolean is accepted as
- * shorthand for "physical throughput on/off with nothing else enabled" —
- * that is what dispersion bundles pass, since they are a visualization that
- * never needs absorption or branching.
- */
+/** Normalise trace options. A boolean means "physical throughput on/off, nothing else", which is what dispersion bundles pass. */
 function normalizeTraceOptions(options) {
   if (typeof options === 'boolean') {
     return {
@@ -895,25 +802,12 @@ class RayTracer {
   }
 
   /**
-   * Trace the primary ray. `options` controls physical throughput:
-   *   - fresnel off               → "fast geometric" mode: every ray is fully
-   *                                  transmitted (throughput ≡ 1), for a quick
-   *                                  look at where the light goes.
-   *   - fresnel on                → "Fresnel-weighted" mode: unpolarised
-   *                                  Fresnel transmittance is tracked at every
-   *                                  interface, so `throughput` is the actual
-   *                                  fraction of the ray's power that survives.
-   *   - + liquidAttenuationPerMm  → Beer–Lambert absorption is also applied
-   *                                  over path length actually spent in the
-   *                                  liquid (not the head-space air, and not
-   *                                  the wall).
-   *   - + branching               → at every interface where the ray is only
-   *                                  PARTLY reflected (not total internal
-   *                                  reflection), a secondary ray carrying the
-   *                                  reflected fraction is also traced
-   *                                  recursively (see traceBranch), and any
-   *                                  power it delivers to the target is
-   *                                  reported separately as `branchPower`.
+   * Trace the primary ray. `options` selects the throughput model:
+   *   fresnel off               every ray fully transmitted (throughput = 1)
+   *   fresnel on                Fresnel transmittance tracked at each interface
+   *   + liquidAttenuationPerMm  Beer–Lambert over the path spent in the liquid
+   *   + branching               partial reflections spawn sub-rays (traceBranch);
+   *                             the power they deliver is reported as `branchPower`
    */
   trace(origin, dir, idx, options) {
     const opts = normalizeTraceOptions(options);
@@ -984,9 +878,8 @@ class RayTracer {
       maxIncidence = Math.max(maxIncidence, Math.acos(clamp(cosI, -1, 1)));
 
       if (!result) {
-        // Total internal reflection: no transmitted direction exists, and all
-        // the power stays with the reflected ray — nothing to branch, the
-        // primary path simply continues as the reflection.
+        // TIR: no transmitted direction, all power stays with the reflected
+        // ray, so there is nothing to branch.
         tir = true;
         if (events.length < 24) events.push({ point: p, label: 'TIR', n1, n2 });
         d = Vec2.normalize(reflect(d, n));
@@ -1037,22 +930,12 @@ class RayTracer {
   }
 
   /**
-   * Trace one reflected sub-ray, recursively. This is the SAME event-finding
-   * and refraction machinery as `trace()`, called on a ray that starts partway
-   * through the bottle carrying only the reflected fraction of the power that
-   * reached its origin. At each further interface it may itself split again
-   * (a second partial reflection), capped by `opts.maxBranchDepth` and pruned
-   * once the carried power falls below `opts.minBranchPower` — both are
-   * necessary because without them the branch count grows as (number of
-   * interfaces)^depth.
-   *
-   * Only the FIRST level of branching is collected for the optional debug
-   * overlay (`branchSegments`); deeper levels still contribute to the power
-   * total but are not drawn, to keep the overlay legible. This function
-   * returns the total power (as a fraction of the ORIGINAL ray's power) that
-   * this branch and its descendants deliver to the target screen — power that
-   * escapes the field of view or is absorbed is simply not counted, exactly
-   * as for the primary ray.
+   * Trace one Fresnel-reflected sub-ray recursively, using the same
+   * event-finding and refraction as `trace()`. Depth is capped by
+   * `opts.maxBranchDepth` and branches under `opts.minBranchPower` are pruned.
+   * Only first-level branches are kept for the debug overlay
+   * (`branchSegments`). Returns the power, as a fraction of the original ray's,
+   * that this branch and its descendants deliver to the target.
    */
   traceBranch(origin, dir, idx, opts, power, depth, collect) {
     if (depth > opts.maxBranchDepth || power < opts.minBranchPower) return 0;
@@ -1126,26 +1009,14 @@ function regionTag(geom, mid, insideOuter, alreadyEntered) {
   return geom.isLiquidAt(mid) ? 'liquid' : 'head';
 }
 
-/**
- * Static medium classification of a point, independent of any ray history —
- * unlike regionTag (which needs to know whether a ray has already entered, to
- * tell 'incoming' from 'exit'). Used by the debug region-colouring overlay,
- * which paints the whole field rather than following a specific ray. Robust
- * to tilt and partial fill because it is built entirely from
- * BottleGeometry's own region tests, which already account for both.
- */
+/** Static medium at a point, independent of ray history (unlike regionTag). Used by the debug overlay, which paints the whole field. */
 function classifyRegion(geom, point) {
   if (!geom.insideOuter(point)) return 'air';
   if (!geom.insideInner(point)) return 'wall';
   return geom.isLiquidAt(point) ? 'liquid' : 'head';
 }
 
-/**
- * Translate UI parameters into RayTracer options.
- * `collect` gates whether branch segments are retained for the debug overlay
- * — off by default (e.g. for the many throwaway models a parameter sweep
- * builds) since nothing ever reads them there.
- */
+/** Translate UI parameters into RayTracer options. `collect` keeps branch segments for the debug overlay; sweeps leave it off. */
 function buildTraceOptions(p, collect) {
   return {
     fresnel: !!p.fresnel,
@@ -1157,12 +1028,11 @@ function buildTraceOptions(p, collect) {
   };
 }
 
-/* ============================================================================
-   6 · BOTTLE LENS MODEL
-   Owns the parameters, builds the geometry, launches the beam, and holds the
-   traced rays. Contains no DOM access whatsoever, which is what lets the
-   parameter sweep construct dozens of throwaway copies.
-   ========================================================================== */
+// -----------------------------------------------------------------------------
+// 6. Bottle lens model
+// Owns the parameters, builds the geometry, launches the beam, and holds the
+// traced rays. No DOM access, so sweeps can build many throwaway copies.
+// -----------------------------------------------------------------------------
 
 class BottleLensModel {
   constructor(params) {
@@ -1193,15 +1063,7 @@ class BottleLensModel {
     this.traceAll();
   }
 
-  /**
-   * Lay out the collimated beam.
-   *
-   * Rays are spaced evenly across a line PERPENDICULAR to the beam, which is
-   * what "collimated with diameter B" actually means, then slid along their
-   * own directions back to a common launch plane. Sliding a ray along itself
-   * does not change the ray, so the perpendicular spacing survives exactly
-   * while the picture stays tidy.
-   */
+  /** Lay out the collimated beam: rays are spaced evenly on a line perpendicular to the beam, then slid along their own directions to a common launch plane, which preserves the perpendicular spacing. */
   buildBeam() {
     const p = this.p;
     const gamma = deg2rad(p.incidenceDeg);
@@ -1230,14 +1092,10 @@ class BottleLensModel {
       const isEdge = n > 1 && (i === 0 || i === n - 1);
 
       if (p.mode === MODE.REVOLVED) {
-        /* Revolving the section means a ray at height h stands for a whole
-           annulus of radius h, so its weight is that annulus's area.
-           Only the UPPER half of the aperture carries power: the rays below
-           the axis are the mirror image of the same rings, and counting them
-           too would both double the flux and — because ±h land at identical
-           radii — halve the apparent ray spacing at the target, corrupting the
-           density estimate. They are still traced and drawn, so the picture
-           stays symmetric; they simply carry no energy. */
+        // Revolved: a ray at height h stands for an annulus, weighted by its
+        // area. Only the upper half-aperture carries power; the lower rays mirror
+        // it and would double the flux and halve the apparent spacing at the
+        // target. They are still traced and drawn.
         if (h < -1e-9) {
           weights.push(0);
         } else {
@@ -1248,12 +1106,9 @@ class BottleLensModel {
           weights.push(Math.PI * (outer * outer - inner * inner));
         }
       } else {
-        /* Extruded: each ray owns a strip one spacing wide — except the two
-           at the ends of the aperture, which own only the inner half of theirs.
-           This is the trapezoid rule, and it is what makes the weights sum to
-           exactly the beam width rather than N/(N−1) times it. Getting this
-           wrong tilts every irradiance by a percent or two, which is small
-           enough to hide and large enough to matter. */
+        // Extruded: each ray owns one spacing, except the end rays, which own
+        // half (trapezoid rule), so the weights sum to the beam width rather
+        // than N/(N−1) times it.
         weights.push(isEdge ? dh / 2 : dh);
       }
     }
@@ -1337,12 +1192,10 @@ class BottleLensModel {
   }
 }
 
-/* ============================================================================
-   7 · OPTICAL ANALYZER
-   Turns a set of traced rays into the numbers a student wants: where the focus
-   is, how badly it is aberrated, how much energy lands where, and how far the
-   ray-density estimate can honestly be pushed.
-   ========================================================================== */
+// -----------------------------------------------------------------------------
+// 7. Optical analyzer
+// Turns traced rays into focus position, aberration, energy distribution, and spot metrics.
+// -----------------------------------------------------------------------------
 
 class OpticalAnalyzer {
   constructor(model) {
@@ -1370,8 +1223,8 @@ class OpticalAnalyzer {
       const ex = ray.trace.exitRay;
       if (!ex || ray.trace.tir) continue;
 
-      // Perpendicular offset from the axis, and its rate of change along the
-      // ray. The crossing is simply where the offset reaches zero.
+      // Perpendicular offset from the axis and its slope along the ray; the
+      // crossing is where the offset reaches zero.
       const offset = Vec2.dot(ex.p, nAx);
       const slope = Vec2.dot(ex.d, nAx);
       if (Math.abs(slope) < 1e-12) continue;
@@ -1426,8 +1279,8 @@ class OpticalAnalyzer {
     for (const ray of this.model.rays) {
       const ex = ray.trace.exitRay;
       if (!ex) {
-        // Rays that never entered the bottle still land on the screen and are
-        // part of the honest background, unless we are hunting for the focus.
+        // Rays that missed the bottle still land on the screen and form the
+        // background, unless we are looking for the focus.
         if (enteredOnly || ray.trace.status !== 'hit') continue;
         hits.push({ y: ray.trace.hitY, p: ray.power });
         continue;
@@ -1441,15 +1294,10 @@ class OpticalAnalyzer {
   }
 
   /**
-   * Narrowest interval containing 50 % of the power — a robust spot-width
-   * metric that, unlike a full width at half maximum, survives multi-peaked
-   * and asymmetric distributions such as those produced by a caustic.
-   *
-   * The power is treated as spread continuously over the same ray tubes the
-   * irradiance profile uses, rather than as spikes at the ray positions.
-   * Measuring ray-centre to ray-centre instead undercounts by one spacing,
-   * which for a broad distribution is a systematic (1 + 1/N) bias in every
-   * concentration and temperature downstream of it.
+   * Narrowest interval holding 50% of the power. Unlike FWHM it is robust for
+   * multi-peaked or asymmetric (caustic) distributions. Power is spread over the
+   * same ray tubes as the irradiance profile; measuring between ray centres
+   * would undercount by one spacing (a 1 + 1/N bias).
    */
   static width50(hits) {
     const samples = toSamples(hits, (h) => h.y);
@@ -1481,13 +1329,7 @@ class OpticalAnalyzer {
     return { width: Number.isFinite(best) ? best : NaN, centre: bestCentre, total };
   }
 
-  /**
-   * Diameter of the circle, centred on the optical axis, containing 50 % of
-   * the power. The rotationally symmetric analogue of width50 — the standard
-   * "encircled energy" metric. It must be centred on the axis rather than on
-   * a centroid, because that is the only place the revolved model has
-   * symmetry.
-   */
+  /** Diameter of the axis-centred circle holding 50% of the power (encircled energy). Centred on the axis, not the centroid, because that is where the revolved model is symmetric. */
   static diameter50(hits, axisY) {
     const samples = toSamples(hits, (h) => Math.abs(h.y - axisY));
     if (!samples.length) return { width: NaN, centre: axisY, total: 0 };
@@ -1523,11 +1365,7 @@ class OpticalAnalyzer {
       : OpticalAnalyzer.width50(hits);
   }
 
-  /**
-   * Scan downstream planes for the tightest spot. This is the "circle of least
-   * confusion", which for an aberrated lens sits noticeably INSIDE the
-   * paraxial focus — a distinction worth measuring rather than assuming.
-   */
+  /** Scan downstream planes for the tightest spot: the circle of least confusion, which for an aberrated lens sits inside the paraxial focus. */
   bestFocus() {
     const m = this.model;
     let bestGap = m.p.targetGap;
@@ -1585,40 +1423,17 @@ class OpticalAnalyzer {
       ? OpticalAnalyzer.diameter50(hits, axisY)
       : OpticalAnalyzer.width50(hits);
 
-    /* ---- Finite-Sun blur ---------------------------------------------------
-       The traced beam is perfectly parallel, but the Sun is not a point: it
-       subtends ~0.53°, so every image of it is smeared by at least f·Θ. This
-       blur is GEOMETRY-DEPENDENT, because the two third-dimension models put
-       the transverse directions to different use:
-
-         - Revolved (rotationally symmetric) mode: the spot is a disc and, by
-           the model's own symmetry, the finite-Sun blur applies equally in
-           BOTH transverse directions — which is exactly what convolving the
-           single radial "diameter50" measure with a blur of the same
-           magnitude already represents. One number, one blur, done.
-
-         - Cylindrical mode: only the traced (in-plane) dimension is ever
-           brought to a focus at all — there is no curvature along the
-           cylinder axis, so that direction never had a "spot size" to blur in
-           the first place. Its extent is set by the illuminated aperture
-           (outOfPlaneWidth) and is left alone here; the finite-Sun correction
-           below applies only to spotWidth, the focused in-plane dimension.
-
-       The geometric (ray-traced) spread and the Sun's own image are
-       independent blur contributions, so they are combined in QUADRATURE —
-       sqrt(a² + b²) — rather than by taking whichever is larger. That is the
-       standard way to combine two independent smooth spreads: a spot already
-       comparable in size to the solar blur comes out measurably wider than
-       either alone, not simply clamped to the bigger number. A separate,
-       purely NUMERICAL floor (the detector cell) is then applied on top via
-       max(), because that one is a resolution limit, not a physical blur. */
-    /* When the bundle does not converge at all (no paraxial focus — e.g. an
-       index-matched or diverging "lens"), there is no image of the Sun being
-       formed, so there is nothing for the Sun's finite size to blur: the
-       blur is 0 rather than computed from an arbitrary reference length like
-       the target distance. This matters in practice, not just at the n=1
-       edge case — any sufficiently weak or strongly aberrated bundle that
-       fails to cross the axis hits the same branch. */
+    // ---- Finite-Sun blur ---------------------------------------------------
+    // The Sun subtends ~0.53°, so any image is smeared by at least w_sun ≈ f·Θ.
+    // The blur applies only to focused dimensions:
+    //   revolved     both transverse directions (one radial measure covers it)
+    //   cylindrical  the in-plane direction only; the out-of-plane extent is
+    //                set by outOfPlaneWidth
+    // Traced spread and solar blur are independent, so they add in quadrature:
+    // w = sqrt(w_traced² + w_sun²). The detector-cell floor is a resolution
+    // limit rather than a physical blur, so it is applied afterwards with max().
+    // No paraxial focus (index-matched or diverging bundle): no Sun image forms,
+    // so the blur is 0 rather than computed from an arbitrary reference length.
     this.solarBlur = Number.isFinite(this.paraxialFocus)
       ? Math.abs(this.paraxialFocus) * SUN_ANGULAR_DIAMETER
       : 0;
@@ -1683,15 +1498,11 @@ class OpticalAnalyzer {
   /* ---- Where the launched power ends up ----------------------------------- */
 
   /**
-   * A full power budget, not just a ray count. Every ray's launched power is
-   * split into exactly the buckets below, so they sum to the total launched
-   * power to numerical precision — verified in the test suite for both
-   * throughput modes. Fresnel reflection loss and Beer–Lambert liquid
-   * absorption are tracked as SEPARATE channels (both reduce `ray.power`
-   * multiplicatively, but they are physically distinct and the UI reports
-   * them separately), and the optional branch-recovery figure is reported on
-   * the side rather than folded into the 100% bar, since it is drawn FROM the
-   * Fresnel-loss bucket rather than being additional power.
+   * Power budget: each ray's launched power is split into the buckets below,
+   * which sum to the launched total (checked in the self-tests for both
+   * throughput modes). Fresnel loss and Beer–Lambert absorption are separate
+   * channels. Branch recovery is reported on the side, because it is drawn from
+   * the Fresnel-loss bucket rather than added to it.
    */
   fateBreakdown() {
     const m = this.model;
@@ -1739,26 +1550,16 @@ class OpticalAnalyzer {
   }
 }
 
-/* ----------------------------------------------------------------------------
-   Ray-tube irradiance profile
-   ----------------------------------------------------------------------------
-   Counting rays per bin is the obvious way to estimate irradiance and it is
-   wrong wherever the rays are sparser than the bins: away from focus the
-   spacing at the screen easily exceeds half a millimetre, and a straight count
-   then produces a comb of alternating empty and full bins — pure aliasing that
-   no amount of smoothing repairs honestly.
-
-   Instead each ray is treated as a narrow TUBE whose width is set by the
-   spacing to its neighbours at the screen, and its power is spread across the
-   bins that tube covers. Where rays bunch together the tube narrows and the
-   irradiance rises on its own; where they fan out it widens and the profile
-   stays flat at exactly the unconcentrated value. This is the standard
-   geometric-optics density estimate, and it needs no smoothing kernel.
-
-   The tube is floored at one bin: a caustic makes the true tube width vanish
-   and the geometric irradiance diverge, so the reported peak is explicitly a
-   resolution-limited estimate rather than a physical value.
-   -------------------------------------------------------------------------- */
+// -----------------------------------------------------------------------------
+// Ray-tube irradiance profile
+// Counting rays per bin aliases wherever rays are sparser than the bins.
+// Instead, each ray is a tube as wide as its spacing to its neighbours at the
+// screen, and its power is spread over the bins the tube covers. Bunching
+// raises irradiance, fanning out returns it to the unconcentrated value, and no
+// smoothing kernel is needed. The tube is floored at one bin: at a caustic the
+// true width vanishes and the geometric irradiance diverges, so the reported
+// peak is resolution-limited.
+// -----------------------------------------------------------------------------
 
 /** Sorted, positive-power samples along one coordinate. */
 function toSamples(hits, coordOf) {
@@ -1768,14 +1569,7 @@ function toSamples(hits, coordOf) {
     .sort((a, b) => a.c - b.c);
 }
 
-/**
- * One-dimensional Voronoi tiling of the samples: each ray owns the ground
- * halfway to each neighbour. The tubes therefore cover the illuminated region
- * exactly once — no gaps, no overlap — whatever the local spacing does, and
- * the two outermost samples own only their inner half. Both the irradiance
- * profile and the spot-width metrics are built from this same tiling, so they
- * cannot disagree with each other.
- */
+/** One-dimensional Voronoi tiling: each ray owns the ground halfway to its neighbours (end rays own their inner half). The tubes cover the illuminated region exactly once, and the profile and spot metrics share this tiling so they agree. */
 function buildTiles(samples) {
   const n = samples.length;
   const tiles = [];
@@ -1906,55 +1700,26 @@ function buildIrradianceProfile(hits, options) {
   return out;
 }
 
-/* ============================================================================
-   8 · HEATING MODEL
-   ----------------------------------------------------------------------------
-   One node, one temperature. The governing balance for a patch of area A is
-
-       C·A·dT/dt = α_solar E A − h A (T − T0) − ε_thermal σ A (T⁴ − T0⁴)
-
-   and because every term carries the same A, the area divides straight out:
-
-       C·dT/dt = α_solar E − h (T − T0) − ε_thermal σ (T⁴ − T0⁴)
-
-   WITHIN THIS LUMPED, ONE-NODE MODEL, that cancellation means the steady
-   temperature depends on the LOCAL IRRADIANCE at the target, not on the total
-   power collected — a bottle that gathers a lot of light but smears it over a
-   wide patch heats that patch no more than an unconcentrated patch would. That
-   is a real and useful statement, but it is scoped to this model's
-   assumptions: it says nothing about whether a physically bigger apparatus is
-   easier or harder to build, aim, or hold in focus, and it ignores lateral
-   conduction, convection driven by the target's actual size and orientation,
-   and the fact that a larger aperture collects a finite-Sun image that is
-   itself larger (see the finite-Sun note in OpticalAnalyzer.targetProfile).
-   "Size doesn't matter" is a statement about this equation, not a general
-   claim about real bottles.
-
-   ---- alpha_solar vs epsilon_thermal: two different numbers -----------------
-   Kirchhoff's law of thermal radiation states that at a given WAVELENGTH,
-   DIRECTION, and POLARISATION, and for a surface in local thermal equilibrium,
-   spectral absorptivity equals spectral emissivity: α(λ) = ε(λ). It does NOT
-   say that a material's absorptivity for sunlight equals its emissivity for
-   its own thermal radiation, because those two processes sit in completely
-   different spectral bands. Incoming sunlight is thermal radiation from a
-   ~5778 K source, peaking (Wien's law) around 500 nm — visible light. The
-   target's own thermal emission at a few hundred kelvin peaks in the mid
-   infrared, several micrometres. A surface's spectral α(λ)/ε(λ) curve can differ
-   enormously between those two bands: this is precisely how a selective solar
-   absorber works, engineered to have high α in the visible (soaks up sunlight)
-   and low ε in the infrared (radiates poorly, so it does not immediately give
-   the heat back). Treating "the absorptivity" as one number that serves both
-   roles would misrepresent exactly the surfaces for which the distinction
-   matters most, so this model exposes them as independent parameters,
-   alphaSolar and epsilonThermal, both defaulting to 0.9 (a plausible grey
-   value for an ordinary dark, non-selective surface) but freely adjustable
-   apart.
-
-   Including the radiative term is not optional in practice regardless of which
-   value ε_thermal takes: at 750 K a surface with ε_thermal = 0.9 radiates
-   roughly 18 kW/m², comparable with the entire concentrated input, and
-   dropping the term inflates the predicted temperature into fantasy.
-   ========================================================================== */
+// -----------------------------------------------------------------------------
+// 8. Heating model
+//
+// One node. For a patch of area A:
+//   C·A·dT/dt = α_solar E A − h A (T − T0) − ε_thermal σ A (T⁴ − T0⁴)
+// Every term carries A, so it cancels:
+//   C·dT/dt = α_solar E − h (T − T0) − ε_thermal σ (T⁴ − T0⁴)
+// In this lumped model the steady temperature therefore depends on local
+// irradiance, not collected power. That is a property of this equation only:
+// lateral conduction, size-dependent convection, and the larger finite-Sun
+// image of a larger aperture are not modelled.
+//
+// α_solar and ε_thermal are separate parameters. Kirchhoff's law equates α(λ)
+// and ε(λ) at the same wavelength, but sunlight (~5778 K, peak ~500 nm) and a
+// target's own emission (mid-infrared) lie in different bands; a selective
+// absorber has α_solar ≫ ε_thermal. Both default to 0.9 (grey, non-selective).
+//
+// The radiative term is essential: at 750 K, ε_thermal = 0.9 radiates
+// ~18 kW/m², comparable to a strongly concentrated input.
+// -----------------------------------------------------------------------------
 
 class HeatingModel {
   constructor(params) {
@@ -1968,13 +1733,7 @@ class HeatingModel {
     this.running = false;
   }
 
-  /**
-   * dT/dt in K/s, with T in °C.
-   * P_abs uses alphaSolar (the target's absorptivity for the incoming solar
-   * spectrum); P_rad uses epsilonThermal (its emissivity for its own
-   * few-hundred-kelvin thermal radiation) — see the note above this class for
-   * why those are not the same number in general.
-   */
+  /** dT/dt in K/s, T in °C. Absorbed power uses alphaSolar; radiated power uses epsilonThermal (see the note above this class). */
   derivative(T, irradiance, p) {
     const convection = p.loss * (T - p.ambient);
     let radiation = 0;
@@ -1986,13 +1745,7 @@ class HeatingModel {
     return (p.alphaSolar * irradiance - convection - radiation) / Math.max(1e-6, p.capacity);
   }
 
-  /**
-   * Step size from the local thermal time constant. The linearised radiative
-   * conductance is 4ε_thermal σT³, which at high temperature dwarfs the
-   * convective term and would destabilise a naive fixed step; taking a fixed
-   * fraction of C/(h + 4ε_thermal σT³) keeps explicit RK4 comfortably stable
-   * throughout.
-   */
+  /** Step size from the local time constant. The linearised radiative conductance 4ε_thermal σT³ dominates at high T, so a fraction of C/(h + 4ε_thermal σT³) keeps explicit RK4 stable. */
   stableStep(T, p) {
     const Tk = T + T0_K;
     const radiativeConductance = p.radiative ? 4 * p.epsilonThermal * SIGMA * Tk * Tk * Tk : 0;
@@ -2045,14 +1798,9 @@ class HeatingModel {
 }
 
 /**
- * Paraxial focal distance for each dispersion band.
- *
- * The colour fringe in the ray diagram is around one per cent wide and is
- * therefore close to invisible at any sensible zoom — which is itself the
- * honest answer for this problem. Quoting the three focal distances says the
- * same thing in a form that can actually be read. A deliberately narrow beam
- * is used so the number is the paraxial chromatic spread, uncontaminated by
- * the much larger spherical aberration.
+ * Paraxial focal distance for each dispersion band. The colour fringe is ~1%
+ * wide and hard to see, so the distances are quoted numerically. A narrow beam
+ * isolates the chromatic spread from spherical aberration.
  */
 function chromaticFoci(params) {
   return DISPERSION.map((band) => {
@@ -2070,26 +1818,21 @@ function chromaticFoci(params) {
   });
 }
 
-/**
- * Qualitative label for the concentration achieved. Deliberately describes the
- * MODEL's behaviour rather than making a claim about the world: nothing here
- * says anything will ignite.
- */
+/** Condition label for the achieved concentration. It describes the model's output only; it does not predict ignition. */
 function concentrationStatus(concentration, temperature) {
   if (!Number.isFinite(concentration) || concentration < 3) {
-    return { level: 0, text: 'Diffuse illumination' };
+    return { level: 0, text: 'Low concentration' };
   }
-  if (concentration < 15) return { level: 1, text: 'Visible concentration' };
-  if (concentration < 60) return { level: 2, text: 'Strong concentration' };
+  if (concentration < 15) return { level: 1, text: 'Moderate concentration' };
+  if (concentration < 60) return { level: 2, text: 'Concentrated region' };
   const hot = Number.isFinite(temperature) && temperature > 200;
-  return { level: 3, text: hot ? 'Model predicts rapid heating' : 'Model predicts strong heating' };
+  return { level: 3, text: hot ? 'High modelled heating' : 'High concentration' };
 }
 
-/* ============================================================================
-   9 · RENDERER — the main ray diagram
-   Pure drawing. Reads the model and analysis, writes pixels, keeps no state
-   beyond the view transform and the star field.
-   ========================================================================== */
+// -----------------------------------------------------------------------------
+// 9. Renderer — the main ray diagram
+// Pure drawing: reads the model and analysis, keeps only the view transform and star field.
+// -----------------------------------------------------------------------------
 
 class Renderer {
   constructor(canvas) {
@@ -2338,13 +2081,10 @@ class Renderer {
     const alpha = clamp(0.85 - n * 0.004, 0.28, 0.8);
 
     if (model.dispersionRays) {
-      /* Additive blending is the physically correct way to superpose three
-         colours of light: where the bundles coincide they add back to white,
-         and only where they separate does a fringe appear. At an honest Δn
-         that separation is of order one per cent, so the bundle is thinned
-         first — sixty overlapping rays per band saturate the whole fan to
-         white and hide the very thing being illustrated. The numeric focal
-         spread in the metrics panel is what actually quantifies this. */
+      // Additive blending superposes coloured light: bundles add to white where
+      // they coincide and fringe where they separate. The bundle is thinned
+      // first, because dense rays saturate the fan to white and hide the ~1%
+      // separation. The metrics panel quantifies it.
       const stride = Math.max(1, Math.round(model.dispersionRays[0].traces.length / 15));
       ctx.globalCompositeOperation = 'lighter';
       ctx.globalAlpha = 0.55;
@@ -2547,11 +2287,10 @@ function heatColor(concentration) {
   return `rgba(${Math.round(lerp(232, 255, k))}, ${Math.round(lerp(150, 246, k))}, ${Math.round(lerp(70, 225, k))}, ${lerp(0.9, 1, k)})`;
 }
 
-/* ============================================================================
-   10 · SMALL PLOT RENDERER
-   A minimal charting layer: axes, ticks, one or more series, and a hover
-   crosshair with a live readout. Deliberately hand-written — no dependencies.
-   ========================================================================== */
+// -----------------------------------------------------------------------------
+// 10. Small plot renderer
+// A minimal hand-written charting layer: axes, ticks, series, and a hover crosshair with readout.
+// -----------------------------------------------------------------------------
 
 class SmallPlot {
   constructor(canvas, readoutEl) {
@@ -2797,13 +2536,11 @@ function tickFormatter(lo, hi, ticks) {
   return (value) => (Object.is(value, -0) ? 0 : value).toFixed(decimals);
 }
 
-/* ============================================================================
-   11 · PARAMETER SWEEP
-   Rebuilds the entire model across a range of one parameter. Cheap enough to
-   run synchronously — a full trace is a few thousand intersection tests — but
-   the UI still paints a "Computing…" state first so a slow machine never looks
-   frozen.
-   ========================================================================== */
+// -----------------------------------------------------------------------------
+// 11. Parameter sweep
+// Rebuilds the model across one parameter's range. Synchronous (a trace is a
+// few thousand intersection tests), but the UI paints "Computing…" first.
+// -----------------------------------------------------------------------------
 
 const SWEEP_X = {
   nLiquid: {
@@ -2834,17 +2571,17 @@ const SWEEP_X = {
 
 const SWEEP_Y = {
   focal: {
-    label: 'Paraxial focal distance',
+    label: 'Reference focal distance',
     unit: 'mm',
     extract: (a) => a.paraxialFocus
   },
   spot: {
-    label: 'Focal-spot width (50 % power)',
+    label: 'Estimated spot width (50% power)',
     unit: 'mm',
     extract: (a) => a.spotWidth
   },
   conc: {
-    label: 'Concentration factor',
+    label: 'Concentration',
     unit: '×',
     extract: (a) => a.concentration
   },
@@ -2866,9 +2603,8 @@ function runSweep(baseParams, xKey, yKey, samples = 32) {
     const params = { ...baseParams };
     xDef.apply(params, v);
 
-    // A cap radius below the bottle radius is geometrically impossible; the
-    // geometry clamps it and would otherwise produce a flat, misleading run of
-    // identical samples, so those points are simply not plotted.
+    // A cap radius below the bottle radius is impossible and would be clamped,
+    // giving a run of identical samples, so those points are skipped.
     if (xKey === 'capRadius' && v < params.diameter / 2 - 1e-9) continue;
 
     try {
@@ -2884,18 +2620,11 @@ function runSweep(baseParams, xKey, yKey, samples = 32) {
   return { points, xDef, yDef };
 }
 
-/* ============================================================================
-   12 · IN-BROWSER SELF-TESTS
-   ----------------------------------------------------------------------------
-   A concise regression suite that runs the SHIPPED code — the exact classes
-   and functions the page itself uses, not a reimplementation — against known
-   closed-form results. This is deliberately small (a dozen or so checks) so
-   it can run on every load without being noticed; the much larger suite this
-   was developed against lives outside the shipped page (a Node harness that
-   loads this file and drives it with a stub DOM), and exercises hundreds of
-   cases across the same functions. What is here is enough to catch a broken
-   build at a glance, rendered into the "Developer validation" drawer.
-   ========================================================================== */
+// -----------------------------------------------------------------------------
+// 12. In-browser self-tests
+// A small regression suite that runs the shipped classes against closed-form
+// results, shown in the Developer validation drawer.
+// -----------------------------------------------------------------------------
 
 function runSelfTests() {
   const results = [];
@@ -3090,10 +2819,10 @@ function runSelfTests() {
   return { results, passed, total: results.length };
 }
 
-/* ============================================================================
-   13 · UI CONTROLLER
-   All DOM access lives here. Everything above is pure computation.
-   ========================================================================== */
+// -----------------------------------------------------------------------------
+// 13. UI controller
+// All DOM access lives here; everything above is pure computation.
+// -----------------------------------------------------------------------------
 
 /** Slider descriptors: id → parameter key, plus how to show the value. */
 const SLIDERS = [
@@ -3193,6 +2922,7 @@ class UIController {
       canvas: id('lens-canvas'),
       validation: id('validation'),
       sanity: id('sanity-list'),
+      sanityCount: id('sanity-count'),
       metricFocal: id('m-focal'),
       metricFocalSub: id('m-focal-sub'),
       metricSpot: id('m-spot'),
@@ -3335,7 +3065,8 @@ class UIController {
         const [x, y] = btn.dataset.sweep.split('|');
         this.el.sweepX.value = x;
         this.el.sweepY.value = y;
-        document.getElementById('section-analysis').scrollIntoView({ behavior: 'smooth' });
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        document.getElementById('section-analysis').scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth' });
         // Let the scroll begin before the synchronous sweep blocks the thread.
         setTimeout(() => this.doSweep(), 350);
       });
@@ -3476,7 +3207,7 @@ class UIController {
         : 'no axis crossing downstream';
     } else {
       this.el.metricFocalSub.textContent = Number.isFinite(a.longitudinalAberration)
-        ? `LSA ${fmt(a.longitudinalAberration, 1)} mm · best focus ${fmt(a.bestFocusGap, 0)} mm`
+        ? `paraxial · best focus ${fmt(a.bestFocusGap, 0)} mm · LSA ${fmt(a.longitudinalAberration, 1)} mm`
         : 'no axis crossing downstream';
     }
 
@@ -3488,17 +3219,17 @@ class UIController {
       ? `×${fmt(a.concentration, 1)}`
       : '—';
     this.el.metricConcSub.textContent =
-      `peak ×${fmt(a.peakConcentration, 1)} · ${p.mode === MODE.REVOLVED ? 'revolved (idealized bound)' : 'extruded (idealized bound)'}`;
+      `hot-region mean · peak ×${fmt(a.peakConcentration, 1)} · ${p.mode === MODE.REVOLVED ? 'revolved' : 'extruded'}`;
 
     this.el.metricPower.textContent = fmtPower(a.absorbedPower);
     this.el.metricPowerSub.textContent = a.spotArea > 0
-      ? `patch ${fmt(a.spotArea * 1e6, 1)} mm² · ${fmt(a.reachFraction * 100, 0)} % of rays land`
-      : 'no power reaching the screen';
+      ? `${fmt(a.spotArea * 1e6, 1)} mm² patch · ${fmt(a.reachFraction * 100, 0)}% of rays land`
+      : 'no power reaches the screen';
 
     this.el.metricTemp.textContent = `${fmt(this.heat.temperature, 1)} °C`;
     this.el.metricTempSub.textContent = this.heat.running
       ? `running · t = ${fmt(this.heat.time, 1)} s`
-      : (this.heat.time > 0 ? `paused at t = ${fmt(this.heat.time, 1)} s` : 'heating paused');
+      : (this.heat.time > 0 ? `paused at t = ${fmt(this.heat.time, 1)} s` : 'heating not started');
 
     const status = concentrationStatus(a.concentration, this.heat.temperature);
     this.el.metricStatus.textContent = status.text;
@@ -3512,26 +3243,26 @@ class UIController {
 
     // --- indices
     if (p.nLiquid <= 1.005) {
-      items.push({ state: 'warn', text: '<b>Liquid index ≈ air.</b> The bottle has almost no lens action; what remains comes from the two wall menisci alone.' });
+      items.push({ state: 'warn', text: '<b>Liquid index ≈ air.</b> Almost no lens action remains; only the wall menisci focus.' });
     } else if (Math.abs(p.nLiquid - p.nWall) < 0.02) {
-      items.push({ state: 'info', text: '<b>Liquid matches the wall.</b> The two inner surfaces are optically invisible, so the bottle behaves as one solid element.' });
+      items.push({ state: 'info', text: '<b>Liquid matches the wall.</b> The inner surfaces vanish optically and the bottle acts as one solid element.' });
     } else if (p.nLiquid > p.nWall) {
-      items.push({ state: 'info', text: '<b>Liquid denser than the wall.</b> The wall→liquid interface now bends rays the other way, and total internal reflection becomes possible on the way out.' });
+      items.push({ state: 'info', text: '<b>Liquid denser than the wall.</b> The wall–liquid interface bends rays the other way, and total internal reflection becomes possible on exit.' });
     } else {
-      items.push({ state: 'ok', text: `<b>Indices are physically ordered:</b> air 1.000 &lt; liquid ${p.nLiquid.toFixed(3)} &lt; wall ${p.nWall.toFixed(3)}.` });
+      items.push({ state: 'ok', text: `<b>Indices are ordered:</b> air 1.000 &lt; liquid ${p.nLiquid.toFixed(3)} &lt; wall ${p.nWall.toFixed(3)}.` });
     }
 
     // --- convergence
     if (!a.converging || !Number.isFinite(a.paraxialFocus)) {
-      items.push({ state: 'warn', text: '<b>The bundle is not converging</b> downstream of the bottle — no useful focus exists for these parameters.' });
+      items.push({ state: 'warn', text: '<b>The bundle does not converge</b> downstream of the bottle, so no useful focus exists for these settings.' });
     } else {
       const ratio = Math.abs(a.longitudinalAberration) / Math.max(1e-6, a.paraxialFocus);
       if (ratio > 0.2) {
-        items.push({ state: 'warn', text: `<b>Strongly aberrated.</b> Marginal rays cross the axis ${fmt(Math.abs(a.longitudinalAberration), 1)} mm from the paraxial focus — ${fmt(ratio * 100, 0)} % of the focal distance. Narrow the beam to see the paraxial limit.` });
+        items.push({ state: 'warn', text: `<b>Strongly aberrated.</b> Marginal rays cross ${fmt(Math.abs(a.longitudinalAberration), 1)} mm from the paraxial focus (${fmt(ratio * 100, 0)}% of the focal distance). Narrow the beam to approach the paraxial limit.` });
       } else if (ratio > 0.04) {
-        items.push({ state: 'info', text: `<b>Moderate spherical aberration:</b> ${fmt(ratio * 100, 1)} % longitudinal spread across the aperture (${fmt(Math.abs(a.longitudinalAberration), 1)} mm).` });
+        items.push({ state: 'info', text: `<b>Moderate spherical aberration:</b> ${fmt(ratio * 100, 1)}% longitudinal spread (${fmt(Math.abs(a.longitudinalAberration), 1)} mm).` });
       } else {
-        items.push({ state: 'ok', text: '<b>Nearly stigmatic</b> over this aperture — the crossing height barely varies with ray height.' });
+        items.push({ state: 'ok', text: '<b>Nearly stigmatic</b> over this aperture.' });
       }
     }
 
@@ -3539,7 +3270,7 @@ class UIController {
     if (Number.isFinite(a.bestFocusGap)) {
       const off = Math.abs(p.targetGap - a.bestFocusGap);
       if (off < Math.max(3, a.bestFocusGap * 0.06)) {
-        items.push({ state: 'ok', text: '<b>Target is at the tightest spot</b> the traced bundle can produce.' });
+        items.push({ state: 'ok', text: '<b>Target is at the tightest spot</b> this bundle can produce.' });
       } else {
         items.push({ state: 'info', text: `<b>Target is ${fmt(off, 0)} mm from best focus</b> (${fmt(a.bestFocusGap, 0)} mm). Snap it there to compare geometries fairly.` });
       }
@@ -3549,37 +3280,36 @@ class UIController {
     const pct = a.reachFraction * 100;
     items.push({
       state: pct > 85 ? 'ok' : pct > 50 ? 'info' : 'warn',
-      text: `<b>${fmt(pct, 0)} % of rays reach the screen.</b> The rest escape the field of view, hit the barrel, or are turned back by total internal reflection.`
+      text: `<b>${fmt(pct, 0)}% of rays reach the screen.</b> The rest miss the target, hit the barrel, or reflect internally.`
     });
 
     // --- finite-Sun blur, combined in quadrature with the traced spot
     if (a.spotLimitedBySun) {
-      const dims = a.blurDimensions === 2 ? 'both transverse dimensions (revolved)' : 'the focused dimension only (cylindrical — the out-of-plane width is untouched)';
+      const dims = a.blurDimensions === 2 ? 'both transverse dimensions (revolved)' : 'the focused dimension only (cylindrical)';
       items.push({
         state: 'info',
-        text: `<b>Dominated by the Sun's finite size.</b> The traced rays converge to ${fmt(a.rawSpotWidth, 3)} mm, but the Sun's 0.53° angular diameter alone would blur a perfect focus to ${fmt(a.solarBlur, 2)} mm here; combined in quadrature the reported spot is ${fmt(a.blurredSpotWidth, 2)} mm, applied in ${dims}.`
+        text: `<b>Set by the Sun's finite size.</b> Traced rays converge to ${fmt(a.rawSpotWidth, 3)} mm; the 0.53° solar disc alone blurs a perfect focus to ${fmt(a.solarBlur, 2)} mm here. Combined in quadrature, the reported spot is ${fmt(a.blurredSpotWidth, 2)} mm, applied in ${dims}.`
       });
     } else if (a.detectorLimited) {
       items.push({
         state: 'info',
-        text: `<b>Spot width floored at the ${fmt(PROFILE_BIN_MM, 1)} mm detector cell.</b> The blurred spot (${fmt(a.blurredSpotWidth, 3)} mm) is finer than this model claims to resolve.`
+        text: `<b>Spot width floored at the ${fmt(PROFILE_BIN_MM, 1)} mm detector cell.</b> The blurred spot (${fmt(a.blurredSpotWidth, 3)} mm) is finer than the model resolves.`
       });
     }
 
     // --- mode validity
     if (p.mode === MODE.REVOLVED && (Math.abs(p.tiltDeg) > 0.01 || Math.abs(p.incidenceDeg) > 0.01)) {
-      items.push({ state: 'warn', text: '<b>Revolved mode assumes on-axis illumination.</b> With the bottle or the beam tilted, the true three-dimensional spot is not rotationally symmetric and the reported concentration is an over-estimate.' });
+      items.push({ state: 'warn', text: '<b>Revolved mode assumes on-axis illumination.</b> With a tilted bottle or beam the spot is not rotationally symmetric, and the reported concentration is an over-estimate.' });
     }
-    items.push({ state: 'info', text: `<b>Concentration figures are idealized radiometric bounds.</b> ${p.mode === MODE.REVOLVED ? 'Revolving' : 'Extruding'} the traced profile is a modelling choice about the unseen third dimension, not a measurement — treat C<sub>revolved</sub> and C<sub>cylindrical</sub> as the two limiting cases a real bottle sits between, not as a prediction for one specific bottle.` });
 
     // --- partial fill
     if (p.fillFraction > 0 && p.fillFraction < 1) {
-      items.push({ state: 'info', text: `<b>Partially filled (${fmt(p.fillFraction * 100, 0)} %).</b> The horizontal air–liquid surface is traced as a real refracting interface, and it stays level however the bottle is tilted.` });
+      items.push({ state: 'info', text: `<b>Partially filled (${fmt(p.fillFraction * 100, 0)}%).</b> The air–liquid surface is a real refracting interface and stays level as the bottle tilts.` });
     }
 
     // --- geometry
     if (this.model.geom.warnings.length) {
-      items.push({ state: 'bad', text: '<b>Geometry was clamped</b> to stay physically constructible — see the notice above the controls.' });
+      items.push({ state: 'bad', text: '<b>Geometry was clamped</b> to stay constructible. See the notice above the controls.' });
     } else {
       items.push({ state: 'ok', text: `<b>Geometry is valid:</b> axial thickness ${fmt(this.model.geom.axialThickness, 1)} mm, wall ${fmt(this.model.geom.t, 2)} mm, cavity half-height ${fmt(this.model.geom.ai, 1)} mm.` });
     }
@@ -3587,6 +3317,15 @@ class UIController {
     this.el.sanity.innerHTML = items
       .map((i) => `<li data-state="${i.state}"><span class="mark">${markFor(i.state)}</span><span class="text">${i.text}</span></li>`)
       .join('');
+
+    // Surface the number of open warnings on the collapsed summary.
+    if (this.el.sanityCount) {
+      const flagged = items.filter((i) => i.state === 'warn' || i.state === 'bad').length;
+      this.el.sanityCount.textContent = flagged
+        ? `· ${flagged} to review`
+        : '· no warnings';
+      this.el.sanityCount.dataset.flagged = flagged ? 'true' : 'false';
+    }
   }
 
   updateProfilePlot() {
@@ -3630,7 +3369,7 @@ class UIController {
       xLabel: a.profileIsRadial ? 'radius from the axis (mm)' : 'height on the screen (mm)',
       yLabel: 'concentration E / E₀',
       hLines: [{ y: 1, color: 'rgba(244, 239, 229, 0.35)', label: 'no bottle' }],
-      idleText: `peak ×${fmt(a.peakConcentration, 1)} · 50 % width ${fmt(a.spotWidth, 2)} mm · hover for values`,
+      idleText: `peak ×${fmt(a.peakConcentration, 1)} · 50% width ${fmt(a.spotWidth, 2)} mm · hover for values`,
       format: (pt) => `${fmt(pt.x, 2)} mm → ×${fmt(pt.y, 2)} = ${fmt(pt.y * E0, 0)} W/m²`
     });
   }
@@ -3685,13 +3424,13 @@ class UIController {
     if (!this.el.fateNote) return;
     if (!p.fresnel) {
       this.el.fateNote.textContent =
-        'Fast geometric mode: every ray is fully transmitted (throughput ≡ 1), so this budget is trivial — turn on physical throughput to see where the power actually goes.';
+        'Fast geometric mode: every ray is fully transmitted, so this budget is trivial. Turn on physical throughput to see the losses.';
     } else if (p.branching) {
       this.el.fateNote.textContent =
-        `Branching mode: of the ${fmt(fate.find((f) => f.key === 'reflected').fraction * 100, 1)} % lost to Fresnel reflection above, tracing reflected sub-rays up to depth ${MAX_BRANCH_DEPTH} recovers an extra ${fmt(a.branchRecoveredFraction * 100, 2)} % onto the target (${fmt(a.branchRecoveredOfReflected * 100, 1)} % of that reflected loss). This recovered power is NOT included in the concentration or temperature figures above — it is reported here only, as the approximation's own accounting of what it left out.`;
+        `Branching recovers an extra ${fmt(a.branchRecoveredFraction * 100, 2)}% onto the target (${fmt(a.branchRecoveredOfReflected * 100, 1)}% of the ${fmt(fate.find((f) => f.key === 'reflected').fraction * 100, 1)}% Fresnel loss, traced to depth ${MAX_BRANCH_DEPTH}). This power is reported here only, not in the concentration or temperature figures.`;
     } else {
       this.el.fateNote.textContent =
-        'Physical throughput mode: Fresnel reflection and any Beer–Lambert liquid absorption are tracked; reflected sub-rays are not traced (turn on branching to recover the small extra contribution they deliver to the target).';
+        'Physical throughput: Fresnel reflection and any liquid absorption are tracked. Turn on branching to trace the reflected light.';
     }
   }
 
@@ -3729,7 +3468,7 @@ class UIController {
       hLines: [{ y: p.ambient, color: 'rgba(131, 184, 215, 0.4)', label: 'ambient' }],
       idleText: this.heat.running
         ? `running · ${fmt(this.heat.temperature, 1)} °C at t = ${fmt(this.heat.time, 1)} s`
-        : `${fmt(this.heat.temperature, 1)} °C at t = ${fmt(this.heat.time, 1)} s — the simplified model, not a prediction of ignition`,
+        : `${fmt(this.heat.temperature, 1)} °C at t = ${fmt(this.heat.time, 1)} s · lumped-model estimate`,
       format: (pt) => `t = ${fmt(pt.x, 1)} s → ${fmt(pt.y, 1)} °C`
     });
   }
@@ -3855,16 +3594,11 @@ function markFor(state) {
   return 'i';
 }
 
-/* ============================================================================
-   14 · BOOT
-   ========================================================================== */
+// -----------------------------------------------------------------------------
+// 14. Boot
+// -----------------------------------------------------------------------------
 
-/**
- * Render the theory section's $...$ / $$...$$ LaTeX with KaTeX.
- * KaTeX is loaded from a CDN; if it is unavailable the raw TeX source stays
- * readable (flagged via .katex-missing) rather than the page breaking — the
- * simulation itself has no dependency on the network at all.
- */
+/** Render the theory's $...$ / $$...$$ LaTeX with KaTeX. Without the CDN the raw TeX stays readable (.katex-missing). */
 function renderMath() {
   if (typeof window.renderMathInElement !== 'function') {
     document.body.classList.add('katex-missing');

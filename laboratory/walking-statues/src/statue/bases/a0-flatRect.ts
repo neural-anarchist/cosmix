@@ -16,7 +16,7 @@ import type { BaseDims, BaseGeometryModule } from "./types";
 export const a0FlatRect: BaseGeometryModule = {
   id: "A0",
   label: "A0 — Flat rectangular prism",
-  summary: "The validated Phase 1 baseline: a plain box, symmetric in both directions.",
+  summary: "The reference base shape the model's checks were run against: a plain box, symmetric in both directions.",
   usesParameters: [
     "baseWidthRatio",
     "baseLengthRatio",

@@ -3,7 +3,7 @@ import type * as THREE from "three";
 import type { Disposable } from "../physics/types";
 
 /** Only the flat mode exists in Phase 1; concave and rough modes are Phase 3
- * and Phase 5 respectively (see PLAN.md). The union is declared in full now
+ * and Phase 5 respectively (see DEVELOPMENT.md). The union is declared in full now
  * so the rest of the codebase (UI select, RoadParams) doesn't need to change
  * shape when they land — selecting an unimplemented mode is rejected with a
  * clear error rather than silently falling back to flat. */
