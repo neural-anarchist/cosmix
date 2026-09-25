@@ -57,7 +57,7 @@ export const SUN = {
   kicker: "The centre · About us",
   radius: 1.05,
   description:
-    "Cosmix is a fantasy physics olympiad academy — built for students who want to train for USAPhO through mock exams, a model library, and interactive simulations, all wrapped in a living cosmic map."
+    ""
 };
 
 export const TEAM = {
@@ -77,7 +77,7 @@ export const WORLDS = [
     label: "The Observatory",
     kicker: "First orbit · Models",
     description:
-      "Clear physics models and conceptual tools for seeing the structure beneath difficult problems.",
+      "A growing library of classic olympiad physics models.",
     color: PALETTE.gold,
     atmosphere: 0xffd9a0,
     size: 0.62,
@@ -93,7 +93,7 @@ export const WORLDS = [
     label: "The Trials",
     kicker: "Second orbit · Mock exams",
     description:
-      "Timed mock USAPhO exams designed for deliberate practice, review, and measurable growth.",
+      "Collection of original mock exams.",
     color: PALETTE.rust,
     atmosphere: 0xff9e78,
     size: 0.7,
@@ -109,7 +109,7 @@ export const WORLDS = [
     label: "The Laboratory",
     kicker: "Third orbit · Simulations",
     description:
-      "Interactive models that turn abstract laws into systems you can adjust, observe, and test.",
+      "Interactive models for you to test out.",
     color: PALETTE.blue,
     atmosphere: 0xa8d8ff,
     size: 0.82,
@@ -125,7 +125,7 @@ export const WORLDS = [
     id: "frontier",
     label: "The Frontier",
     kicker: "Fourth orbit · Archive",
-    description: "A curated directory of outside problem archives, references, communities and tools — the edge of what Cosmix builds itself.",
+    description: "A directory of recommended resources that Cosmix builds itself upon.",
     color: 0xd5d8df,
     atmosphere: PALETTE.violet,
     size: 0.46,
